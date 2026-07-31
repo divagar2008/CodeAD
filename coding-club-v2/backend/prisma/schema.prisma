@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model admins {
+  id         Int      @id @default(autoincrement())
+  name       String
+  email      String   @unique
+  password   String
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model students {
+  id              Int      @id @default(autoincrement())
+  name            String
+  email           String   @unique
+  password        String
+  department      String?
+  year            String?
+  coding_score    Int      @default(0)
+  total_points    Int      @default(0)
+  problems_solved Int      @default(0)
+  is_active       Boolean  @default(true)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  submissions submissions[]
+  live_points live_points[]
+  leaderboard leaderboard?
+  profile     user_profiles?
+}
+
+model problems {
+  id                Int      @id @default(autoincrement())
+  title             String
+  description       String
+  difficulty        String   @default("easy")
+  input_description String?
+  output_description String?
+  constraints       String?
+  examples          Json?
+  is_active         Boolean  @default(true)
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  submissions submissions[]
+}
+
+model submissions {
+  id                 Int      @id @default(autoincrement())
+  student_id         Int
+  problem_id         Int
+  code               String
+  language           String
+  ai_score           Int?
+  logical_correctness Int?
+  syntax_review      String?
+  suggestions        String?
+  time_complexity    String?
+  space_complexity   String?
+  mistakes           String?
+  ai_feedback        Json?
+  created_at         DateTime @default(now())
+
+  student students @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  problem problems @relation(fields: [problem_id], references: [id], onDelete: Cascade)
+}
+
+model live_sessions {
+  id           Int      @id @default(autoincrement())
+  name         String
+  date         DateTime
+  description  String?
+  is_published Boolean  @default(false)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  live_points live_points[]
+}
+
+model live_points {
+  id         Int      @id @default(autoincrement())
+  session_id Int
+  student_id Int
+  points     Int      @default(0)
+  created_at DateTime @default(now())
+
+  session live_sessions @relation(fields: [session_id], references: [id], onDelete: Cascade)
+  student students     @relation(fields: [student_id], references: [id], onDelete: Cascade)
+
+  @@unique([session_id, student_id])
+}
+
+model leaderboard {
+  id              Int @id @default(autoincrement())
+  student_id      Int @unique
+  coding_score    Int @default(0)
+  live_session_pts Int @default(0)
+  total_score     Int @default(0)
+  updated_at      DateTime @updatedAt
+
+  student students @relation(fields: [student_id], references: [id], onDelete: Cascade)
+}
+
+model user_profiles {
+  id           Int      @id @default(autoincrement())
+  student_id   Int      @unique
+  bio          String?
+  github_url   String?
+  linkedin_url String?
+  skills       Json?
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  student students @relation(fields: [student_id], references: [id], onDelete: Cascade)
+}
+
+model activity_logs {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  user_type  String
+  action     String
+  details    Json?
+  created_at DateTime @default(now())
+}
