@@ -4,7 +4,7 @@ const BASE = 'http://localhost:5000/api';
 async function test() {
   console.log('1. Logging in...');
   const loginRes = await axios.post(BASE + '/auth/student/login', {
-    email: 'alice@college.edu',
+    email: 'athief@college.edu',
     password: 'student123'
   });
   const token = loginRes.data.data.token;

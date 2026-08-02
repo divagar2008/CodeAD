@@ -23,6 +23,9 @@
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0"
   },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
   "devDependencies": {
     "nodemon": "^3.0.3",
     "prisma": "^5.10.0"

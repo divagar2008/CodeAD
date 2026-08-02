@@ -13,6 +13,7 @@ const studentRoutes = require('./modules/students/routes');
 const adminRoutes = require('./modules/admin/routes');
 const problemRoutes = require('./modules/problems/routes');
 const sessionRoutes = require('./modules/sessions/routes');
+const achievementRoutes = require('./modules/students/routes/achievementRoutes');
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.use('/api/student', studentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/problems', problemRoutes);
 app.use('/api/admin/sessions', sessionRoutes);
+app.use('/api/student/achievements', achievementRoutes);
 
 app.use((_, res) => res.status(404).json({ success: false, message: 'Not found' }));
 app.use(errorHandler);

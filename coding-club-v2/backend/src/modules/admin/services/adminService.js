@@ -86,3 +86,103 @@ exports.getReports = async (req, res, next) => {
     });
   } catch (err) { next(err); }
 };
+
+exports.getAnalytics = async (req, res, next) => {
+  try {
+    const [totalStudents, totalProblems, totalSubmissions, avgResult] = await Promise.all([
+      prisma.students.count(), prisma.problems.count(), prisma.submissions.count(),
+      prisma.submissions.aggregate({ _avg: { ai_score: true } }),
+    ]);
+
+    // ── Submissions Over Time (last 30 days) ──
+    const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    thirtyDaysAgo.setHours(0, 0, 0, 0);
+    const recentSubs = await prisma.submissions.findMany({
+      where: { created_at: { gte: thirtyDaysAgo } },
+      select: { created_at: true },
+      orderBy: { created_at: 'asc' },
+    });
+
+    const subsByDay = {};
+    const d = new Date(thirtyDaysAgo);
+    while (d <= new Date()) {
+      const key = d.toISOString().slice(0, 10);
+      subsByDay[key] = 0;
+      d.setDate(d.getDate() + 1);
+    }
+    recentSubs.forEach(s => {
+      const key = s.created_at.toISOString().slice(0, 10);
+      if (subsByDay[key] !== undefined) subsByDay[key]++;
+    });
+    const submissionsOverTime = Object.entries(subsByDay).map(([date, count]) => ({
+      date: date.slice(5),
+      submissions: count,
+    }));
+
+    // ── Single query for score distribution, language usage, and difficulty breakdown ──
+    const allSubmissions = await prisma.submissions.findMany({
+      select: { ai_score: true, language: true, problem: { select: { difficulty: true } } },
+    });
+
+    const scoreRanges = [
+      { label: '0-20', min: 0, max: 20 },
+      { label: '21-40', min: 21, max: 40 },
+      { label: '41-60', min: 41, max: 60 },
+      { label: '61-80', min: 61, max: 80 },
+      { label: '81-100', min: 81, max: 100 },
+    ];
+    const scoreDistribution = scoreRanges.map(r => ({
+      range: r.label,
+      count: allSubmissions.filter(s => s.ai_score != null && s.ai_score >= r.min && s.ai_score <= r.max).length,
+    }));
+
+    const langMap = {};
+    const diffCounts = { easy: 0, medium: 0, hard: 0 };
+    allSubmissions.forEach(s => {
+      langMap[s.language] = (langMap[s.language] || 0) + 1;
+      const d = s.problem?.difficulty || 'easy';
+      if (diffCounts[d] !== undefined) diffCounts[d]++;
+    });
+    const languageUsage = Object.entries(langMap)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+    const difficultyBreakdown = [
+      { name: 'Easy', submissions: diffCounts.easy, fill: '#22c55e' },
+      { name: 'Medium', submissions: diffCounts.medium, fill: '#f59e0b' },
+      { name: 'Hard', submissions: diffCounts.hard, fill: '#ef4444' },
+    ];
+
+    // ── Top Performers ──
+    const topPerformers = await prisma.leaderboard.findMany({
+      include: { student: { select: { id: true, name: true } } },
+      orderBy: { total_score: 'desc' }, take: 10,
+    });
+    const topPerformersData = topPerformers.map((e, i) => ({
+      rank: i + 1,
+      name: e.student?.name || 'Unknown',
+      score: e.total_score || 0,
+      coding: e.coding_score || 0,
+      live: e.live_session_pts || 0,
+    }));
+
+    // ── Department breakdown ──
+    const deptCounts = await prisma.students.groupBy({
+      by: ['department'], _count: { department: true }, orderBy: { _count: { department: 'desc' } },
+    });
+    const departmentBreakdown = deptCounts.map(d => ({
+      name: d.department || 'Unknown',
+      count: d._count.department,
+    }));
+
+    ApiResponse.success(res, {
+      totalStudents, totalProblems, totalSubmissions,
+      averageAiScore: Math.round(avgResult._avg.ai_score || 0),
+      submissionsOverTime,
+      scoreDistribution,
+      languageUsage,
+      difficultyBreakdown,
+      topPerformers: topPerformersData,
+      departmentBreakdown,
+    });
+  } catch (err) { next(err); }
+};

@@ -11,11 +11,4 @@ router.post('/student/login',
   authService.studentLogin
 );
 
-router.post('/admin/login',
-  body('email').isEmail().withMessage('Valid email required'),
-  body('password').isLength({ min: 6 }).withMessage('Password min 6 chars'),
-  validate,
-  authService.adminLogin
-);
-
 module.exports = router;

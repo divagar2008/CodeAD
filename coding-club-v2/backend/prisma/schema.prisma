@@ -7,21 +7,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model admins {
-  id         Int      @id @default(autoincrement())
-  name       String
-  email      String   @unique
-  password   String
-  is_active  Boolean  @default(true)
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-}
-
 model students {
   id              Int      @id @default(autoincrement())
   name            String
   email           String   @unique
   password        String
+  role            String   @default("student")
   department      String?
   year            String?
   coding_score    Int      @default(0)
@@ -31,10 +22,11 @@ model students {
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
 
-  submissions submissions[]
-  live_points live_points[]
-  leaderboard leaderboard?
-  profile     user_profiles?
+  submissions           submissions[]
+  live_points           live_points[]
+  leaderboard           leaderboard?
+  profile               user_profiles?
+  student_achievements  student_achievements[]
 }
 
 model problems {
@@ -120,6 +112,33 @@ model user_profiles {
   updated_at   DateTime @updatedAt
 
   student students @relation(fields: [student_id], references: [id], onDelete: Cascade)
+}
+
+model achievements {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  title       String
+  description String
+  icon        String?
+  category    String   @default("milestone")
+  tier        String   @default("bronze")
+  criteria    Json?
+  points      Int      @default(0)
+  created_at  DateTime @default(now())
+
+  student_achievements student_achievements[]
+}
+
+model student_achievements {
+  id             Int      @id @default(autoincrement())
+  student_id     Int
+  achievement_id Int
+  earned_at      DateTime @default(now())
+
+  student     students     @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  achievement achievements @relation(fields: [achievement_id], references: [id], onDelete: Cascade)
+
+  @@unique([student_id, achievement_id])
 }
 
 model activity_logs {

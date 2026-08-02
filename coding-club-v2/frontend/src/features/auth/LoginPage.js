@@ -6,7 +6,7 @@ import ShaderAnimation from '../../components/ui/ShaderAnimation';
 
 export default function LoginPage() {
   const login = useAuthStore(s => s.login);
-  const [tab, setTab] = useState('student');
+  const navigate = useNavigate();
   const [form, setForm] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
 
@@ -15,8 +15,9 @@ export default function LoginPage() {
     if (!form.email || !form.password) return toast.error('Fill all fields');
     setLoading(true);
     try {
-      const user = await login(tab, form.email, form.password);
+      const user = await login('student', form.email, form.password);
       toast.success(`Welcome, ${user.name}!`);
+      navigate('/dashboard');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Login failed');
     } finally {
@@ -49,33 +50,11 @@ export default function LoginPage() {
             </svg>
           </div>
 
-          <h2 className="login-title">{tab === 'student' ? 'Student' : 'Admin'} Login</h2>
-          <p className="login-subtitle">Sign in to your account</p>
-
-          {/* Role tabs */}
-          <div className="login-tabs">
-            <button
-              className={`login-tab ${tab === 'student' ? 'active' : ''}`}
-              onClick={() => setTab('student')}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-              </svg>
-              Student
-            </button>
-            <button
-              className={`login-tab ${tab === 'admin' ? 'active' : ''}`}
-              onClick={() => setTab('admin')}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-              </svg>
-              Admin
-            </button>
-          </div>
+          <h2 className="login-title">Welcome Back</h2>
+          <p className="login-subtitle">Sign in to your coding club account</p>
 
           {/* Login form */}
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} autoComplete="off">
             <div className="login-field">
               <label>Email</label>
               <div className="login-input-wrap">
@@ -85,6 +64,8 @@ export default function LoginPage() {
                 <input
                   type="email"
                   placeholder="you@college.edu"
+                  autoComplete="off"
+                  name="login_email"
                   value={form.email}
                   onChange={e => setForm({ ...form, email: e.target.value })}
                 />
@@ -99,6 +80,8 @@ export default function LoginPage() {
                 <input
                   type="password"
                   placeholder="••••••••"
+                  autoComplete="new-password"
+                  name="login_password"
                   value={form.password}
                   onChange={e => setForm({ ...form, password: e.target.value })}
                 />

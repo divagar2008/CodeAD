@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from './stores/authStore';
+import api from './lib/api';
 import LoginPage from './features/auth/LoginPage';
 import StudentLayout from './features/student/StudentLayout';
 import AdminLayout from './features/admin/AdminLayout';
@@ -9,13 +10,15 @@ import AdminLayout from './features/admin/AdminLayout';
 function Guard({ children, role }) {
   const user = useAuthStore(s => s.user);
   if (!user) return <Navigate to="/login" />;
-  if (role && user.role !== role) return <Navigate to="/login" />;
+  // Admin-role students can access both student and admin routes
+  if (role === 'student' && user.role !== 'student' && user.role !== 'admin') return <Navigate to="/login" />;
+  if (role === 'admin' && user.role !== 'admin') return <Navigate to="/login" />;
   return children;
 }
 
 function Public({ children }) {
   const user = useAuthStore(s => s.user);
-  if (user) return <Navigate to={user.role === 'admin' ? '/admin' : '/dashboard'} />;
+  if (user) return <Navigate to="/dashboard" />;
   return children;
 }
 
@@ -27,9 +30,23 @@ export default function App() {
     localStorage.setItem('theme', isDark ? 'light' : 'dark');
   };
 
+  const updateUser = useAuthStore(s => s.updateUser);
+  const token = useAuthStore(s => s.token);
+
   useEffect(() => {
     const t = localStorage.getItem('theme') || 'light';
     document.documentElement.setAttribute('data-theme', t);
+  }, []);
+
+  // Auto-refresh user role from API on mount (fixes stale localStorage)
+  useEffect(() => {
+    if (!token) return;
+    api.get('/student/profile').then(r => {
+      if (r.data?.data) {
+        const d = r.data.data;
+        updateUser({ role: d.role || 'student', name: d.name });
+      }
+    }).catch(() => {});
   }, []);
 
   return (

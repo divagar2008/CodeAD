@@ -1,17 +1,28 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFetch } from '../../hooks/useFetch';
+import { useAuthStore } from '../../stores/authStore';
 
 export default function Dashboard() {
   const { data, loading } = useFetch('/student/dashboard');
   const navigate = useNavigate();
+  const user = useAuthStore(s => s.user);
+  const isAdmin = user?.role === 'admin';
   if (loading) return <div className="loading-page"><div className="spinner" /></div>;
   const s = data?.student;
   const subs = data?.recentSubmissions || [];
 
   return (
     <>
-      <div className="header"><h1>Welcome, {s?.name}</h1></div>
+      <div className="header">
+        <h1>Welcome, {s?.name}</h1>
+        {isAdmin && (
+          <button className="admin-badge-btn" onClick={() => navigate('/admin')}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Admin Panel
+          </button>
+        )}
+      </div>
       <div className="body">
         <div className="grid g4" style={{ marginBottom: 24 }}>
           {[

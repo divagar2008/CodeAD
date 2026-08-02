@@ -3,6 +3,7 @@ const prisma = require('../../../config/database');
 const ApiResponse = require('../../../shared/utils/response');
 const { NotFoundError, ConflictError, ValidationError, ForbiddenError } = require('../../../shared/errors');
 const { logActivity, calculateScore } = require('../../../shared/utils/helpers');
+const { checkAndAwardAchievements } = require('./achievementChecker');
 
 exports.getDashboard = async (req, res, next) => {
   try {
@@ -99,7 +100,43 @@ exports.getProblem = async (req, res, next) => {
       }
     }
 
-    ApiResponse.success(res, problem);
+    const existingSubmission = await prisma.submissions.findFirst({
+      where: { student_id: req.user.id, problem_id: Number(req.params.id) },
+      orderBy: { created_at: 'desc' },
+    });
+
+    ApiResponse.success(res, {
+      ...problem,
+      hasSubmitted: !!existingSubmission,
+      existingSubmission,
+    });
+  } catch (err) { next(err); }
+};
+
+exports.compileCode = async (req, res, next) => {
+  try {
+    const { problem_id, code, language } = req.body;
+    const problem = await prisma.problems.findUnique({ where: { id: Number(problem_id) } });
+    if (!problem) throw new NotFoundError('Problem not found');
+
+    let exampleInput = '';
+    if (problem.examples) {
+      if (typeof problem.examples === 'object' && problem.examples.input) {
+        exampleInput = problem.examples.input;
+      } else if (typeof problem.examples === 'string') {
+        try {
+          const parsed = JSON.parse(problem.examples);
+          exampleInput = parsed.input || '';
+        } catch (e) {
+          exampleInput = problem.examples;
+        }
+      }
+    }
+
+    const nemotronService = require('../../../ai/nemotronService');
+    const result = await nemotronService.compileCode(problem.description, code, language, exampleInput);
+
+    ApiResponse.success(res, result);
   } catch (err) { next(err); }
 };
 
@@ -108,6 +145,13 @@ exports.submitCode = async (req, res, next) => {
     const { problem_id, code, language } = req.body;
     const problem = await prisma.problems.findUnique({ where: { id: Number(problem_id) } });
     if (!problem) throw new NotFoundError('Problem not found');
+
+    const existingSubmission = await prisma.submissions.findFirst({
+      where: { student_id: req.user.id, problem_id: Number(problem_id) },
+    });
+    if (existingSubmission) {
+      throw new ForbiddenError('You have already submitted a solution for this problem. Only one submission is permitted per problem.');
+    }
 
     const nemotronService = require('../../../ai/nemotronService');
     const review = await nemotronService.reviewCode(problem.description, code, language);
@@ -137,7 +181,10 @@ exports.submitCode = async (req, res, next) => {
 
     logActivity(req.user.id, 'student', 'submit_code', { problem_id, language, score: review.ai_score });
 
-    ApiResponse.success(res, { submission, review, pointsEarned: points });
+    // Auto-check and award achievements
+    const newAchievements = await checkAndAwardAchievements(req.user.id);
+
+    ApiResponse.success(res, { submission, review, pointsEarned: points, newAchievements });
   } catch (err) { next(err); }
 };
 
@@ -176,7 +223,55 @@ exports.getProfile = async (req, res, next) => {
       },
     });
     if (!student) throw new NotFoundError('Student not found');
-    ApiResponse.success(res, student);
+
+    const [submissions, leaderboardEntry, livePointsData] = await Promise.all([
+      prisma.submissions.findMany({
+        where: { student_id: req.user.id },
+        select: { id: true, language: true, ai_score: true, created_at: true },
+        orderBy: { created_at: 'desc' },
+      }),
+      prisma.leaderboard.findUnique({ where: { student_id: req.user.id } }),
+      prisma.live_points.aggregate({
+        where: { student_id: req.user.id },
+        _sum: { points: true },
+      }),
+    ]);
+
+    // Language breakdown
+    const languageMap = {};
+    let totalScore = 0;
+    let scoreCount = 0;
+    submissions.forEach(s => {
+      languageMap[s.language] = (languageMap[s.language] || 0) + 1;
+      if (s.ai_score != null) { totalScore += s.ai_score; scoreCount++; }
+    });
+    const languages = Object.entries(languageMap)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+
+    const avgScore = scoreCount > 0 ? Math.round(totalScore / scoreCount) : 0;
+    const bestScore = submissions.length > 0 ? Math.max(...submissions.map(s => s.ai_score || 0)) : 0;
+    const totalLivePoints = livePointsData._sum.points || 0;
+
+    // Leaderboard rank
+    let rank = null;
+    if (leaderboardEntry) {
+      const higher = await prisma.leaderboard.count({ where: { total_score: { gt: leaderboardEntry.total_score } } });
+      rank = higher + 1;
+    }
+
+    ApiResponse.success(res, {
+      ...student,
+      languages,
+      avgScore,
+      bestScore,
+      totalSubmissions: submissions.length,
+      rank,
+      totalLivePoints,
+      recentSubmissions: submissions.slice(0, 5).map(s => ({
+        id: s.id, language: s.language, ai_score: s.ai_score, created_at: s.created_at,
+      })),
+    });
   } catch (err) { next(err); }
 };
 

@@ -152,12 +152,54 @@ JSON format:
       logical_correctness: 0,
       ai_score: 0,
       time_complexity: 'N/A',
-      space_complexity: 'N/A',
-      mistakes: 'AI service is currently unavailable. Please try submitting again.',
       suggestions: 'Please try submitting again in a moment.',
       syntax_review: 'N/A',
       better_coding_practices: 'N/A',
       summary: 'AI service is currently unavailable.',
+    };
+  }
+
+  async compileCode(problemDescription, code, language, exampleInput = '') {
+    const { executeJS, executePython } = require('../shared/utils/codeExecutor');
+    let localExec = null;
+
+    if (language === 'javascript') {
+      localExec = executeJS(code, exampleInput);
+    } else if (language === 'python') {
+      localExec = await executePython(code, exampleInput);
+    }
+
+    const review = await this.reviewCode(problemDescription, code, language);
+
+    const hasSyntaxError = (localExec && localExec.executed && localExec.has_syntax_error) || review.has_syntax_error;
+    const syntaxLine = (localExec && localExec.syntax_error_line) || review.syntax_error_line || 1;
+    const syntaxMsg = (localExec && localExec.syntax_error_message) || review.syntax_error_message || 'Syntax Error';
+
+    let programOutput = localExec?.program_output || '';
+    if (!programOutput || programOutput === 'Program executed cleanly (No print output)' || programOutput === 'Code executed cleanly (No console.log / print output)') {
+      programOutput = review.summary || 'Code executed cleanly.';
+    }
+
+    let outputLog = '';
+    let errorLog = '';
+
+    if (hasSyntaxError) {
+      errorLog = `[Compilation Error] Line ${syntaxLine}: ${syntaxMsg}\n${review.syntax_review || ''}`;
+      outputLog = `Compilation Failed!\nFound syntax error on line ${syntaxLine}: ${syntaxMsg}`;
+    } else {
+      outputLog = `=================== PROGRAM STDOUT / OUTPUT ===================\n${programOutput}\n===============================================================\n\n[Compilation Details]\n- Language: ${language}\n- Time Complexity: ${review.time_complexity}\n- Space Complexity: ${review.space_complexity}\n- Status: Ready for submission`;
+      errorLog = 'No compilation errors. Code is ready for submission.';
+    }
+
+    return {
+      success: !hasSyntaxError,
+      has_syntax_error: hasSyntaxError,
+      syntax_error_line: syntaxLine,
+      syntax_error_message: syntaxMsg,
+      program_output: programOutput,
+      output_log: outputLog,
+      error_log: errorLog,
+      review,
     };
   }
 }

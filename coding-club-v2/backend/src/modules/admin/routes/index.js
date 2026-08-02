@@ -11,5 +11,6 @@ router.post('/students', [body('name').trim().isLength({ min: 2 }), body('email'
 router.put('/students/:id', [param('id').isInt()], validate, svc.updateStudent);
 router.delete('/students/:id', [param('id').isInt()], validate, svc.deleteStudent);
 router.get('/reports', svc.getReports);
+router.get('/analytics', svc.getAnalytics);
 
 module.exports = router;

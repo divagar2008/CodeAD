@@ -29,11 +29,11 @@ async function testFullProduction() {
   let studentToken = null;
   try {
     const res = await axios.post(`${BASE}/auth/student/login`, {
-      email: 'alice@college.edu',
+      email: 'athief@college.edu',
       password: 'student123'
     });
     studentToken = res.data.data.token;
-    logPass('2. Student Login (alice@college.edu)', `Token length: ${studentToken.length}`);
+    logPass('2. Student Login (athief@college.edu)', `Token length: ${studentToken.length}`);
   } catch (err) {
     logFail('2. Student Login', err.response?.data?.message || err.message);
   }
@@ -53,7 +53,7 @@ async function testFullProduction() {
 
   // 4. Invalid Login Validation
   try {
-    await axios.post(`${BASE}/auth/student/login`, { email: 'alice@college.edu', password: 'wrongpassword' });
+    await axios.post(`${BASE}/auth/student/login`, { email: 'athief@college.edu', password: 'wrongpassword' });
     logFail('4. Invalid Password Rejection', 'Expected 401/400 error but request succeeded');
   } catch (err) {
     if (err.response?.status === 400 || err.response?.status === 401) {
