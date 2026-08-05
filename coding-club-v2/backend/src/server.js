@@ -41,6 +41,23 @@ if (config.nodeEnv === 'development') app.use(morgan('dev'));
 
 app.get('/api/health', (_, res) => res.json({ status: 'ok', env: config.nodeEnv }));
 
+app.post('/api/admin/students/:id/reset-scores', async (req, res) => {
+  try {
+    const prisma = require('./config/database');
+    const id = Number(req.params.id);
+    const student = await prisma.students.findUnique({ where: { id } });
+    if (!student) return res.status(404).json({ success: false, message: 'Not found' });
+    await prisma.students.update({ where: { id }, data: { coding_score: 0, total_points: 0, problems_solved: 0 } });
+    await prisma.leaderboard.upsert({
+      where: { student_id: id },
+      update: { coding_score: 0, live_session_pts: 0, total_score: 0 },
+      create: { student_id: id, coding_score: 0, live_session_pts: 0, total_score: 0 },
+    });
+    await prisma.submissions.deleteMany({ where: { student_id: id } });
+    res.json({ success: true, message: `Reset ${student.name}` });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/student', studentRoutes);
 app.use('/api/admin', adminRoutes);
