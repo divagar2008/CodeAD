@@ -20,15 +20,17 @@ const app = express();
 app.use(helmet());
 app.use(cors({
   origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
     const allowedOrigins = [
       config.frontendUrl,
       'http://localhost:3000',
+      'https://code-ad-iota.vercel.app',
       'https://codead.vercel.app',
     ];
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      callback(null, origin);
     } else {
-      callback(null, true);
+      callback(null, origin);
     }
   },
   credentials: true
