@@ -101,8 +101,8 @@ function Podium({ top3 }) {
 
 export default function Leaderboard() {
   const { data, loading } = useFetch('/student/leaderboard');
-  const hasScores = data && data.some(e => e.total_score > 0);
-  const top3 = hasScores ? data.filter(e => e.rank <= 3 && e.total_score > 0) : [];
+  const ranked = data ? data.filter(e => e.total_score > 0) : [];
+  const top3 = ranked.filter(e => e.rank <= 3);
 
   return (
     <>
@@ -117,13 +117,13 @@ export default function Leaderboard() {
               <div className="table-wrap"><table>
                 <thead><tr><th>Rank</th><th>Student</th><th>Department</th><th>Coding</th><th>Live</th><th>Total</th></tr></thead>
                 <tbody>
-                  {(!data || data.length === 0) ? <tr><td colSpan={6} className="empty">No data yet</td></tr> :
-                    data.map(e => (
-                      <tr key={e.student?.id} className={hasScores && e.rank <= 3 ? `leaderboard-top-${e.rank}` : ''}>
-                        <td>{hasScores ? <RankBadge rank={e.rank} /> : <span className="rank rank-n">{e.rank}</span>}</td>
+                  {ranked.length === 0 ? <tr><td colSpan={6} className="empty">No scores yet — submit a solution to get ranked</td></tr> :
+                    ranked.map(e => (
+                      <tr key={e.student?.id} className={e.rank <= 3 ? `leaderboard-top-${e.rank}` : ''}>
+                        <td><RankBadge rank={e.rank} /></td>
                         <td style={{ fontWeight: 500 }}>
                           {e.student?.name}
-                          {hasScores && e.rank <= 3 && <span className="rank-title">#{e.rank}</span>}
+                          {e.rank <= 3 && <span className="rank-title">#{e.rank}</span>}
                         </td>
                         <td style={{ color: 'var(--text-secondary)' }}>{e.student?.department || '-'}</td>
                         <td>{e.coding_score}</td>
