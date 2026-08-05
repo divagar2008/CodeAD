@@ -46,6 +46,16 @@ exports.updateStudent = async (req, res, next) => {
     if (!student) throw new NotFoundError('Student not found');
 
     const updated = await prisma.students.update({ where: { id: Number(id) }, data: req.body });
+
+    if ('coding_score' in req.body || 'total_points' in req.body || 'problems_solved' in req.body) {
+      await prisma.leaderboard.upsert({
+        where: { student_id: Number(id) },
+        update: { coding_score: updated.coding_score, total_score: updated.total_points },
+        create: { student_id: Number(id), coding_score: updated.coding_score, total_score: updated.total_points },
+      });
+      await prisma.submissions.deleteMany({ where: { student_id: Number(id) } });
+    }
+
     logActivity(req.user.id, 'admin', 'update_student', { id: Number(id) });
     ApiResponse.success(res, { id: updated.id, name: updated.name, email: updated.email }, 'Updated');
   } catch (err) { next(err); }
@@ -58,28 +68,6 @@ exports.deleteStudent = async (req, res, next) => {
     await prisma.students.delete({ where: { id: Number(req.params.id) } });
     logActivity(req.user.id, 'admin', 'delete_student', { id: Number(req.params.id) });
     ApiResponse.success(res, null, 'Deleted');
-  } catch (err) { next(err); }
-};
-
-exports.resetStudentScores = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const student = await prisma.students.findUnique({ where: { id: Number(id) } });
-    if (!student) throw new NotFoundError('Student not found');
-
-    await prisma.students.update({
-      where: { id: Number(id) },
-      data: { coding_score: 0, total_points: 0, problems_solved: 0 },
-    });
-    await prisma.leaderboard.upsert({
-      where: { student_id: Number(id) },
-      update: { coding_score: 0, live_session_pts: 0, total_score: 0 },
-      create: { student_id: Number(id), coding_score: 0, live_session_pts: 0, total_score: 0 },
-    });
-    await prisma.submissions.deleteMany({ where: { student_id: Number(id) } });
-
-    logActivity(req.user.id, 'admin', 'reset_student_scores', { id: Number(id) });
-    ApiResponse.success(res, null, `Reset scores for ${student.name}`);
   } catch (err) { next(err); }
 };
 
