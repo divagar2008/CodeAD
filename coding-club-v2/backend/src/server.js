@@ -18,7 +18,21 @@ const achievementRoutes = require('./modules/students/routes/achievementRoutes')
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: config.frontendUrl, credentials: true }));
+app.use(cors({
+  origin: function (origin, callback) {
+    const allowedOrigins = [
+      config.frontendUrl,
+      'http://localhost:3000',
+      'https://codead.vercel.app',
+    ];
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, true);
+    }
+  },
+  credentials: true
+}));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 200 }));
 app.use(express.json({ limit: '10mb' }));
 if (config.nodeEnv === 'development') app.use(morgan('dev'));
