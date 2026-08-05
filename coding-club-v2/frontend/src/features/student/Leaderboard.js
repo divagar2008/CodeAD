@@ -119,11 +119,11 @@ export default function Leaderboard() {
                 <tbody>
                   {(!data || data.length === 0) ? <tr><td colSpan={6} className="empty">No data yet</td></tr> :
                     data.map(e => (
-                      <tr key={e.student?.id} className={e.rank <= 3 ? `leaderboard-top-${e.rank}` : ''}>
-                        <td><RankBadge rank={e.rank} /></td>
+                      <tr key={e.student?.id} className={hasScores && e.rank <= 3 ? `leaderboard-top-${e.rank}` : ''}>
+                        <td>{hasScores ? <RankBadge rank={e.rank} /> : <span className="rank rank-n">{e.rank}</span>}</td>
                         <td style={{ fontWeight: 500 }}>
                           {e.student?.name}
-                          {e.rank <= 3 && <span className="rank-title">#{e.rank}</span>}
+                          {hasScores && e.rank <= 3 && <span className="rank-title">#{e.rank}</span>}
                         </td>
                         <td style={{ color: 'var(--text-secondary)' }}>{e.student?.department || '-'}</td>
                         <td>{e.coding_score}</td>
