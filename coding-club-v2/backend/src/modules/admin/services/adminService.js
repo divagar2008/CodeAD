@@ -61,6 +61,28 @@ exports.deleteStudent = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+exports.resetStudentScores = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const student = await prisma.students.findUnique({ where: { id: Number(id) } });
+    if (!student) throw new NotFoundError('Student not found');
+
+    await prisma.students.update({
+      where: { id: Number(id) },
+      data: { coding_score: 0, total_points: 0, problems_solved: 0 },
+    });
+    await prisma.leaderboard.upsert({
+      where: { student_id: Number(id) },
+      update: { coding_score: 0, live_session_pts: 0, total_score: 0 },
+      create: { student_id: Number(id), coding_score: 0, live_session_pts: 0, total_score: 0 },
+    });
+    await prisma.submissions.deleteMany({ where: { student_id: Number(id) } });
+
+    logActivity(req.user.id, 'admin', 'reset_student_scores', { id: Number(id) });
+    ApiResponse.success(res, null, `Reset scores for ${student.name}`);
+  } catch (err) { next(err); }
+};
+
 exports.getReports = async (req, res, next) => {
   try {
     const [totalStudents, totalProblems, totalSubmissions, avgResult] = await Promise.all([
