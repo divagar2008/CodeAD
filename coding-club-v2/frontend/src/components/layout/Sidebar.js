@@ -43,13 +43,13 @@ export default function Sidebar({ links, basePath }) {
           onClick={() => setIsOpen(!isOpen)}
           aria-label="Toggle menu"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="3" y1="6" x2="21" y2="6"/>
             <line x1="3" y1="12" x2="21" y2="12"/>
             <line x1="3" y1="18" x2="21" y2="18"/>
           </svg>
         </button>
-        <span className="mobile-topbar-title">&lt;/&gt; Coding Club</span>
+        <span className="mobile-topbar-title">&lt;/&gt; CodeAD</span>
         <button
           className="mobile-theme-btn"
           onClick={toggleTheme}
@@ -70,9 +70,12 @@ export default function Sidebar({ links, basePath }) {
       {/* Sidebar Drawer */}
       <aside className={`sidebar ${isOpen ? 'sidebar-open' : ''}`}>
         <div className="sidebar-brand-container">
-          <div className="sidebar-brand">&lt;/&gt; Coding Club</div>
+          <div className="sidebar-brand">&lt;/&gt; CodeAD</div>
           <button className="sidebar-close-btn" onClick={() => setIsOpen(false)} aria-label="Close menu">
-            &times;
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
           </button>
         </div>
         <nav className="sidebar-nav">

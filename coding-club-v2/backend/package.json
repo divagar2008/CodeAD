@@ -2,6 +2,9 @@
   "name": "coding-club-v2-backend",
   "version": "2.0.0",
   "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",

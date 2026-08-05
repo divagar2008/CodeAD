@@ -4,12 +4,13 @@ export default function MentorBadge({ mentor }) {
   if (!mentor || !mentor.isMentor) return null;
 
   const tierStyles = {
-    Grandmaster: { bg: 'linear-gradient(135deg, rgba(255,215,0,0.15), rgba(245,158,11,0.1))', border: 'rgba(255,215,0,0.4)', color: '#ffd700', icon: '👑' },
-    Master: { bg: 'linear-gradient(135deg, rgba(185,242,255,0.15), rgba(137,180,250,0.1))', border: 'rgba(185,242,255,0.4)', color: '#b9f2ff', icon: '💎' },
-    Expert: { bg: 'linear-gradient(135deg, rgba(166,227,161,0.15), rgba(137,220,143,0.1))', border: 'rgba(166,227,161,0.4)', color: '#a6e3a1', icon: '🎓' },
+    'The Champion': { bg: 'linear-gradient(135deg, rgba(255,215,0,0.2), rgba(245,158,11,0.15))', border: 'rgba(255,215,0,0.5)', color: '#ffd700', icon: '🏆' },
+    'The Conqueror': { bg: 'linear-gradient(135deg, rgba(192,192,192,0.2), rgba(156,163,175,0.15))', border: 'rgba(192,192,192,0.5)', color: '#c0c0c0', icon: '⚔️' },
+    'The Victor': { bg: 'linear-gradient(135deg, rgba(205,127,50,0.2), rgba(180,83,9,0.1))', border: 'rgba(205,127,50,0.4)', color: '#cd7f32', icon: '🛡️' },
+    'Mentor': { bg: 'linear-gradient(135deg, rgba(59,130,246,0.15), rgba(37,99,235,0.1))', border: 'rgba(59,130,246,0.3)', color: '#60a5fa', icon: '💎' },
   };
 
-  const style = tierStyles[mentor.mentorTier] || tierStyles.Expert;
+  const style = tierStyles[mentor.mentorTier] || tierStyles['Mentor'];
 
   return (
     <div className="card" style={{

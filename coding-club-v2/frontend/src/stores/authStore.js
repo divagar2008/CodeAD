@@ -21,6 +21,21 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
+  register: async (name, email, password, department, year) => {
+    set({ loading: true });
+    try {
+      const { data } = await api.post('/auth/student/register', { name, email, password, department, year });
+      const { token, user } = data.data;
+      localStorage.setItem('cc_token', token);
+      localStorage.setItem('cc_user', JSON.stringify(user));
+      set({ user, token, loading: false });
+      return user;
+    } catch (err) {
+      set({ loading: false });
+      throw err;
+    }
+  },
+
   logout: () => {
     localStorage.removeItem('cc_token');
     localStorage.removeItem('cc_user');

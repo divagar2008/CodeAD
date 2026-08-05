@@ -172,7 +172,7 @@ export default function ProblemPage() {
       <div className="ide-header">
         <button className="btn btn-sm btn-outline" onClick={() => nav('/problems')}>&larr; Back</button>
         <h1 style={{ flex: 1 }}>{problem.title}</h1>
-        <span className={`badge badge-${problem.difficulty}`}>{problem.difficulty}</span>
+        <span className={`badge badge-${problem.difficulty}`}>{problem.difficulty.charAt(0).toUpperCase() + problem.difficulty.slice(1)}</span>
         <select
           className="select"
           value={lang}
@@ -313,16 +313,16 @@ export default function ProblemPage() {
                       <div>
                         {compileResult.program_output && (
                           <div style={{ marginBottom: 14 }}>
-                            <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#89b4fa', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <div className="console-output-label">
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
                               Exact Code Output (stdout / return value):
                             </div>
-                            <pre className="log-pre" style={{ background: '#11111b', color: '#89b4fa', border: '1px solid #313244', fontSize: '0.9rem', fontWeight: 600 }}>
+                            <pre className="log-pre log-pre-output">
                               {compileResult.program_output}
                             </pre>
                           </div>
                         )}
-                        <div style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 6 }}>Compilation & Execution Summary:</div>
+                        <div className="console-output-label">Compilation & Execution Summary:</div>
                         <pre className="log-pre">{compileResult.output_log}</pre>
                       </div>
                     ) : (
@@ -335,7 +335,7 @@ export default function ProblemPage() {
                   <div>
                     {compileResult?.has_syntax_error ? (
                       <div>
-                        <div className="syntax-error-banner" style={{ marginBottom: 12 }}>
+                        <div className="syntax-error-banner">
                           <div className="syntax-error-icon">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
                           </div>
@@ -347,7 +347,7 @@ export default function ProblemPage() {
                         <pre className="error-pre">{compileResult.error_log}</pre>
                       </div>
                     ) : compileResult ? (
-                      <pre className="log-pre" style={{ color: '#a6e3a1' }}>✓ Clean build: No syntax or compilation errors found!</pre>
+                      <pre className="log-pre log-pre-success">✓ Clean build: No syntax or compilation errors found!</pre>
                     ) : (
                       <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>Click "Run / Compile" to check your code for syntax errors.</p>
                     )}

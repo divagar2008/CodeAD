@@ -133,7 +133,7 @@ export default function Problems() {
                           Solved
                         </span>
                       )}
-                      <span className={`badge badge-${p.difficulty}`}>{p.difficulty}</span>
+                      <span className={`badge badge-${p.difficulty}`}>{p.difficulty.charAt(0).toUpperCase() + p.difficulty.slice(1)}</span>
                     </div>
                   </div>
                   <p>{p.description}</p>

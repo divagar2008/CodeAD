@@ -37,15 +37,15 @@ export default function Dashboard() {
         {/* ─── Summary Stats ─── */}
         <div className="grid g4" style={{ marginBottom: 24 }}>
           {[
-            ['Students', a.totalStudents || 0, '#89b4fa', 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2'],
-            ['Problems', a.totalProblems || 0, '#a6e3a1', 'M16 18l2-2-2-2M8 18l-2-2 2-2M14 4l-4 16'],
-            ['Submissions', a.totalSubmissions || 0, '#f9e2af', 'M22 12h-4l-3 9L9 3l-3 9H2'],
-            ['Avg Score', `${a.averageAiScore || 0}%`, '#cba6f7', 'M12 20V10M18 20V4M6 20v-4'],
-          ].map(([label, val, color, path]) => (
+            ['Students', a.totalStudents || 0, '#89b4fa', <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></>],
+            ['Problems', a.totalProblems || 0, '#a6e3a1', <><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></>],
+            ['Submissions', a.totalSubmissions || 0, '#f9e2af', <path d="M22 12h-4l-3 9L9 3l-3 9H2" />],
+            ['Avg Score', `${a.averageAiScore || 0}%`, '#cba6f7', <><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></>],
+          ].map(([label, val, color, icon]) => (
             <div className="card stat" key={label} style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 10 }}>
               <div className="stat-icon" style={{ background: `${color}18`, color }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d={path} />
+                  {icon}
                 </svg>
               </div>
               <div className="stat-value">{val}</div>
@@ -172,15 +172,30 @@ export default function Dashboard() {
                 <tbody>
                   {(!a.topPerformers || a.topPerformers.length === 0) ? (
                     <tr><td colSpan={3} className="empty">No data</td></tr>
-                  ) : a.topPerformers.slice(0, 5).map((e) => (
-                    <tr key={e.name}>
-                      <td>
-                        <span className={`rank ${e.rank <= 3 ? `rank-${e.rank}` : 'rank-n'}`}>{e.rank}</span>
-                      </td>
-                      <td style={{ fontWeight: 500 }}>{e.name}</td>
-                      <td style={{ fontWeight: 600 }}>{e.score}</td>
-                    </tr>
-                  ))}
+                  ) : a.topPerformers.slice(0, 5).map((e) => {
+                    const medalStyles = {
+                      1: { bg: 'linear-gradient(135deg, #fbbf24, #f59e0b)', shadow: '0 2px 12px rgba(251,191,36,0.4)' },
+                      2: { bg: 'linear-gradient(135deg, #d1d5db, #9ca3af)', shadow: '0 2px 10px rgba(156,163,175,0.4)' },
+                      3: { bg: 'linear-gradient(135deg, #d97706, #b45309)', shadow: '0 2px 10px rgba(217,119,6,0.4)' },
+                    };
+                    const m = medalStyles[e.rank];
+                    return (
+                      <tr key={e.name} className={e.rank <= 3 ? `leaderboard-top-${e.rank}` : ''}>
+                        <td>
+                          {m ? (
+                            <span className="rank-medal" style={{ background: m.bg, boxShadow: m.shadow }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                              <span className="rank-medal-num">{e.rank}</span>
+                            </span>
+                          ) : (
+                            <span className="rank rank-n">{e.rank}</span>
+                          )}
+                        </td>
+                        <td style={{ fontWeight: 500 }}>{e.name}</td>
+                        <td style={{ fontWeight: 600 }}>{e.score}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

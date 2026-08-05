@@ -51,15 +51,15 @@ export default function Reports() {
         {/* ─── Summary Stats ─── */}
         <div className="grid g4" style={{ marginBottom: 24 }}>
           {[
-            ['Students', a.totalStudents, '#89b4fa', 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2'],
-            ['Problems', a.totalProblems, '#a6e3a1', 'M16 18l2-2-2-2M8 18l-2-2 2-2M14 4l-4 16'],
-            ['Submissions', a.totalSubmissions, '#f9e2af', 'M22 12h-4l-3 9L9 3l-3 9H2'],
-            ['Avg Score', `${a.averageAiScore}%`, '#cba6f7', 'M12 20V10M18 20V4M6 20v-4'],
-          ].map(([label, value, color, path]) => (
+            ['Students', a.totalStudents, '#89b4fa', <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></>],
+            ['Problems', a.totalProblems, '#a6e3a1', <><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></>],
+            ['Submissions', a.totalSubmissions, '#f9e2af', <path d="M22 12h-4l-3 9L9 3l-3 9H2" />],
+            ['Avg Score', `${a.averageAiScore}%`, '#cba6f7', <><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></>],
+          ].map(([label, value, color, icon]) => (
             <div className="card stat" key={label} style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 10 }}>
               <div className="stat-icon" style={{ background: `${color}18`, color }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d={path} />
+                  {icon}
                 </svg>
               </div>
               <div className="stat-value">{value}</div>
@@ -275,7 +275,7 @@ export default function Reports() {
                 <ResponsiveContainer>
                   <BarChart data={a.departmentBreakdown} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} interval={0} angle={-20} textAnchor="end" height={60} />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} interval={0} />
                     <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} allowDecimals={false} />
                     <Tooltip content={<CustomTooltip />} />
                     <Bar dataKey="count" name="Students" radius={[6, 6, 0, 0]} maxBarSize={56}>

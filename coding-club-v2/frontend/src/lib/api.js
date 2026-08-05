@@ -2,7 +2,8 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
-  timeout: 60000,
+  // AI review can take up to 120s server-side; keep a comfortable margin.
+  timeout: 150000,
 });
 
 api.interceptors.request.use((config) => {

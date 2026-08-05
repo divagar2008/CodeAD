@@ -7,8 +7,8 @@ async function main() {
 
   const studentPass = await bcrypt.hash('student123', 12);
 
-  // Clear existing student data for a fresh start
-  console.log('Clearing existing student data...');
+  // Clear existing data for a fresh start
+  console.log('Clearing existing data...');
   await prisma.student_achievements.deleteMany();
   await prisma.submissions.deleteMany();
   await prisma.leaderboard.deleteMany();
@@ -16,8 +16,11 @@ async function main() {
   await prisma.user_profiles.deleteMany();
   await prisma.activity_logs.deleteMany();
   await prisma.students.deleteMany();
+  await prisma.problems.deleteMany();
+  await prisma.live_sessions.deleteMany();
+  await prisma.achievements.deleteMany();
 
-  // Real classmates — Artificial Intelligence, 2nd Year
+  // Students — Artificial Intelligence, 2nd Year
   const students = [
     { name: 'Athief Khan', email: 'athief@college.edu', department: 'Artificial Intelligence', year: '2nd', role: 'student' },
     { name: 'Divagar', email: 'divagar@college.edu', department: 'Artificial Intelligence', year: '2nd', role: 'admin' },
@@ -35,14 +38,19 @@ async function main() {
   ];
 
   for (const s of students) {
-    const student = await prisma.students.upsert({ where: { email: s.email }, update: {},
-      create: { ...s, password: studentPass } });
-    await prisma.leaderboard.upsert({ where: { student_id: student.id }, update: {},
-      create: { student_id: student.id } });
-    await prisma.user_profiles.upsert({ where: { student_id: student.id }, update: {},
-      create: { student_id: student.id } });
+    const student = await prisma.students.create({
+      data: { ...s, password: studentPass }
+    });
+    await prisma.leaderboard.create({
+      data: { student_id: student.id, coding_score: 0, live_session_pts: 0, total_score: 0 }
+    });
+    await prisma.user_profiles.create({
+      data: { student_id: student.id }
+    });
   }
+  console.log(`Created ${students.length} students`);
 
+  // Problems
   const problems = [
     { title: 'Two Sum', description: 'Given an array of integers nums and an integer target, return indices of the two numbers that add up to target.', difficulty: 'easy', constraints: '2 <= nums.length <= 10^4', examples: { input: 'nums = [2,7,11,15], target = 9', output: '[0,1]' } },
     { title: 'Reverse String', description: 'Write a function that reverses a string given as a character array.', difficulty: 'easy', examples: { input: 'hello', output: 'olleh' } },
@@ -55,61 +63,20 @@ async function main() {
   for (const p of problems) {
     await prisma.problems.create({ data: p });
   }
+  console.log(`Created ${problems.length} problems`);
 
-  await prisma.live_sessions.create({ data: { name: 'Weekly Challenge #1', date: new Date('2026-08-05T18:00:00Z'), description: 'First session', is_published: true } });
-
-  // Add all students to the live session with points
-  console.log('Adding students to live session...');
-  const session = await prisma.live_sessions.findFirst({ where: { name: 'Weekly Challenge #1' } });
-  
-  // Sample live points for each student
-  const livePointsData = [
-    { studentEmail: 'athief@college.edu', points: 150 },
-    { studentEmail: 'divagar@college.edu', points: 120 },
-    { studentEmail: 'dharshan@college.edu', points: 100 },
-    { studentEmail: 'jeyavarshan@college.edu', points: 90 },
-    { studentEmail: 'deepan@college.edu', points: 110 },
-    { studentEmail: 'vetriselvam@college.edu', points: 85 },
-    { studentEmail: 'heman@college.edu', points: 95 },
-    { studentEmail: 'gopalkarthick@college.edu', points: 130 },
-    { studentEmail: 'kanish@college.edu', points: 75 },
-    { studentEmail: 'devadharshan@college.edu', points: 140 },
-    { studentEmail: 'sankara@college.edu', points: 105 },
-    { studentEmail: 'srinivash@college.edu', points: 115 },
-    { studentEmail: 'sriram@college.edu', points: 95 },
-  ];
-
-  for (const lp of livePointsData) {
-    const student = await prisma.students.findUnique({ where: { email: lp.studentEmail } });
-    if (student && session) {
-      await prisma.live_points.upsert({
-        where: { session_id_student_id: { session_id: session.id, student_id: student.id } },
-        update: { points: lp.points },
-        create: { session_id: session.id, student_id: student.id, points: lp.points },
-      });
-      console.log(`  + ${student.name}: ${lp.points} pts`);
+  // Live session (no points assigned yet — admin can award them during the demo)
+  await prisma.live_sessions.create({
+    data: {
+      name: 'Weekly Challenge #1',
+      date: new Date(),
+      description: 'Live coding session — points awarded by admin during the session',
+      is_published: true,
     }
-  }
+  });
+  console.log('Created 1 live session');
 
-  // Update leaderboard with live session points
-  console.log('\nUpdating leaderboard with live session points...');
-  for (const lp of livePointsData) {
-    const student = await prisma.students.findUnique({ where: { email: lp.studentEmail } });
-    if (student) {
-      const totalLive = await prisma.live_points.aggregate({
-        where: { student_id: student.id },
-        _sum: { points: true },
-      });
-      const livePts = totalLive._sum.points || 0;
-      await prisma.leaderboard.upsert({
-        where: { student_id: student.id },
-        update: { live_session_pts: livePts, total_score: student.coding_score + livePts },
-        create: { student_id: student.id, live_session_pts: livePts, total_score: student.coding_score + livePts },
-      });
-    }
-  }
-
-  // Seed achievements
+  // Achievements
   const achievements = [
     { name: 'first_blood', title: 'First Blood', description: 'Solve your first problem', icon: '🎯', category: 'milestone', tier: 'bronze', points: 10 },
     { name: 'five_solves', title: 'Getting Started', description: 'Solve 5 problems', icon: '🔥', category: 'milestone', tier: 'bronze', points: 25 },
@@ -134,11 +101,12 @@ async function main() {
   ];
 
   for (const a of achievements) {
-    await prisma.achievements.upsert({ where: { name: a.name }, update: {}, create: a });
+    await prisma.achievements.create({ data: a });
   }
+  console.log(`Created ${achievements.length} achievements`);
 
-  console.log('Done!\n');
-  console.log('Admin-students (password: student123):');
+  console.log('\nDone! All data reset to clean state.\n');
+  console.log('Admin accounts (password: student123):');
   students.filter(s => s.role === 'admin').forEach(s => console.log(`  - ${s.name} <${s.email}>`));
   console.log('\nStudent accounts (password: student123):');
   students.filter(s => s.role === 'student').forEach(s => console.log(`  - ${s.email}`));

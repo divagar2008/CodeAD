@@ -99,7 +99,7 @@ async function getTopStudents(excludeId, limit = 10) {
 async function getMentorStatus(studentId) {
   const entries = await prisma.leaderboard.findMany({ orderBy: { total_score: 'desc' }, take: 5 });
   const rank = entries.findIndex(e => e.student_id === studentId);
-  return { isMentor: rank !== -1, mentorRank: rank !== -1 ? rank + 1 : null, mentorTier: rank === 0 ? 'Grandmaster' : rank < 3 ? 'Master' : 'Expert' };
+  return { isMentor: rank !== -1, mentorRank: rank !== -1 ? rank + 1 : null, mentorTier: rank === 0 ? 'The Champion' : rank === 1 ? 'The Conqueror' : rank === 2 ? 'The Victor' : 'Mentor' };
 }
 
 module.exports = { getTier, getStreak, getHeatmap, getScoreHistory, getTopStudents, getMentorStatus, TIERS };

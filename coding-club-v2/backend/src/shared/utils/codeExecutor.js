@@ -51,55 +51,74 @@ function executeJS(code, exampleInput = '') {
 
 /**
  * Executes Python code using system python process and captures stdout/stderr.
+ * Tries `python` first, then falls back to `python3` (common on Linux servers).
  */
 function executePython(code, exampleInput = '') {
   return new Promise((resolve) => {
     const tempFile = path.join(os.tmpdir(), `script_${Date.now()}_${Math.random().toString(36).substring(7)}.py`);
-    try {
-      fs.writeFileSync(tempFile, code);
-      const pyProcess = spawn('python', [tempFile], { timeout: 4000 });
+    const pyBins = ['python', 'python3'];
+    let binIndex = 0;
 
-      let stdout = '';
-      let stderr = '';
+    const cleanup = () => { try { fs.unlinkSync(tempFile); } catch (e) {} };
 
-      if (exampleInput && pyProcess.stdin) {
-        pyProcess.stdin.write(exampleInput + '\n');
-        pyProcess.stdin.end();
+    const run = () => {
+      if (binIndex >= pyBins.length) {
+        cleanup();
+        return resolve({ executed: false, error: 'Python interpreter not found on server (tried python and python3)' });
       }
 
-      pyProcess.stdout.on('data', (data) => { stdout += data.toString(); });
-      pyProcess.stderr.on('data', (data) => { stderr += data.toString(); });
+      const pyBin = pyBins[binIndex++];
+      try {
+        fs.writeFileSync(tempFile, code);
+        const pyProcess = spawn(pyBin, [tempFile], { timeout: 4000 });
 
-      pyProcess.on('close', (code) => {
-        try { fs.unlinkSync(tempFile); } catch (e) {}
+        let stdout = '';
+        let stderr = '';
 
-        if (code !== 0 || stderr.trim()) {
-          const lineMatch = stderr.match(/File ".*", line (\d+)/);
-          return resolve({
-            executed: true,
-            has_syntax_error: true,
-            syntax_error_line: lineMatch ? Number(lineMatch[1]) : 1,
-            syntax_error_message: stderr.trim() || 'Python execution error',
-            program_output: stdout.trim(),
-            error_message: stderr.trim(),
-          });
+        if (exampleInput && pyProcess.stdin) {
+          pyProcess.stdin.write(exampleInput + '\n');
+          pyProcess.stdin.end();
         }
 
-        resolve({
-          executed: true,
-          has_syntax_error: false,
-          program_output: stdout.trim() || 'Program executed cleanly (No print output)',
-          error_message: null,
-        });
-      });
+        pyProcess.stdout.on('data', (data) => { stdout += data.toString(); });
+        pyProcess.stderr.on('data', (data) => { stderr += data.toString(); });
 
-      pyProcess.on('error', (err) => {
-        try { fs.unlinkSync(tempFile); } catch (e) {}
+        pyProcess.on('close', (code) => {
+          cleanup();
+
+          if (code !== 0 || stderr.trim()) {
+            const lineMatch = stderr.match(/File ".*", line (\d+)/);
+            return resolve({
+              executed: true,
+              has_syntax_error: true,
+              syntax_error_line: lineMatch ? Number(lineMatch[1]) : 1,
+              syntax_error_message: stderr.trim() || 'Python execution error',
+              program_output: stdout.trim(),
+              error_message: stderr.trim(),
+            });
+          }
+
+          resolve({
+            executed: true,
+            has_syntax_error: false,
+            program_output: stdout.trim() || 'Program executed cleanly (No print output)',
+            error_message: null,
+          });
+        });
+
+        pyProcess.on('error', (err) => {
+          cleanup();
+          // ENOENT means the binary doesn't exist — try the next candidate
+          if (err.code === 'ENOENT') return run();
+          resolve({ executed: false, error: err.message });
+        });
+      } catch (err) {
+        cleanup();
         resolve({ executed: false, error: err.message });
-      });
-    } catch (err) {
-      resolve({ executed: false, error: err.message });
-    }
+      }
+    };
+
+    run();
   });
 }
 

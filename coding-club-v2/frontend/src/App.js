@@ -38,13 +38,18 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', t);
   }, []);
 
-  // Auto-refresh user role from API on mount (fixes stale localStorage)
+  // Auto-refresh user data from API on mount (fixes stale localStorage)
   useEffect(() => {
     if (!token) return;
     api.get('/student/profile').then(r => {
       if (r.data?.data) {
         const d = r.data.data;
-        updateUser({ role: d.role || 'student', name: d.name });
+        const updates = { name: d.name };
+        // Only overwrite role if the API actually returns one;
+        // otherwise keep the existing role from localStorage to avoid
+        // downgrading an admin to student on page refresh.
+        if (d.role) updates.role = d.role;
+        updateUser(updates);
       }
     }).catch(() => {});
   }, []);

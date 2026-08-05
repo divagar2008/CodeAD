@@ -217,7 +217,7 @@ exports.getProfile = async (req, res, next) => {
     const student = await prisma.students.findUnique({
       where: { id: req.user.id },
       select: {
-        id: true, name: true, email: true, department: true, year: true,
+        id: true, name: true, email: true, role: true, department: true, year: true,
         coding_score: true, total_points: true, problems_solved: true,
         is_active: true, created_at: true, profile: true,
       },

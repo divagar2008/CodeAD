@@ -67,7 +67,7 @@ export default function Problems() {
                   list.map(p => (
                     <tr key={p.id}>
                       <td style={{ fontWeight: 500 }}>{p.title}</td>
-                      <td><span className={`badge badge-${p.difficulty}`}>{p.difficulty}</span></td>
+                      <td><span className={`badge badge-${p.difficulty}`}>{p.difficulty.charAt(0).toUpperCase() + p.difficulty.slice(1)}</span></td>
                       <td>{p._count?.submissions || 0}</td>
                       <td><div style={{ display: 'flex', gap: 6 }}>
                         <button className="btn btn-sm btn-outline" onClick={() => openEdit(p)}>Edit</button>

@@ -39,14 +39,19 @@ async function testFullProduction() {
   }
 
   // 3. Admin Authentication
+  // NOTE: Admins are students with role='admin' in the DB and log in via the
+  // same /auth/student/login endpoint (no separate /auth/admin/login route exists).
   let adminToken = null;
   try {
-    const res = await axios.post(`${BASE}/auth/admin/login`, {
-      email: 'admin@codingclub.com',
-      password: 'admin123'
+    const res = await axios.post(`${BASE}/auth/student/login`, {
+      email: 'divagar@college.edu',
+      password: 'student123'
     });
+    if (res.data.data.user.role !== 'admin') {
+      throw new Error(`Expected seeded admin role, got: ${res.data.data.user.role}`);
+    }
     adminToken = res.data.data.token;
-    logPass('3. Admin Login (admin@codingclub.com)', `Token length: ${adminToken.length}`);
+    logPass('3. Admin Login (divagar@college.edu)', `Token length: ${adminToken.length}, Role: ${res.data.data.user.role}`);
   } catch (err) {
     logFail('3. Admin Login', err.response?.data?.message || err.message);
   }
@@ -63,28 +68,60 @@ async function testFullProduction() {
     }
   }
 
-  // 5. Student Dashboard API
+  // 5. Create a fresh throwaway student (via admin API) and login as them.
+  // Tests 5-11 run against this account so the suite is fully re-runnable:
+  // a fresh student always has unsubmitted unlocked problems to work with.
+  let freshStudentId = null;
+  let freshStudentToken = null;
   try {
-    const res = await axios.get(`${BASE}/student/dashboard`, { headers: { Authorization: `Bearer ${studentToken}` } });
-    logPass('5. Student Dashboard API', `Student Name: ${res.data.data.student.name}`);
+    const freshStudentEmail = `suite_${Date.now()}@college.edu`;
+    const createRes = await axios.post(`${BASE}/admin/students`, {
+      name: 'Suite Test Student',
+      email: freshStudentEmail,
+      password: 'password123',
+      department: 'Artificial Intelligence',
+      year: '2nd'
+    }, { headers: { Authorization: `Bearer ${adminToken}` } });
+    freshStudentId = createRes.data.data.id;
+    const loginRes = await axios.post(`${BASE}/auth/student/login`, {
+      email: freshStudentEmail,
+      password: 'password123'
+    });
+    freshStudentToken = loginRes.data.data.token;
+    logPass('5. Fresh Test Student Creation & Login', `ID #${freshStudentId}`);
   } catch (err) {
-    logFail('5. Student Dashboard API', err.response?.data?.message || err.message);
+    logFail('5. Fresh Test Student Creation & Login', err.response?.data?.message || err.message);
+  }
+
+  // 5b. Student Dashboard API (fresh student)
+  try {
+    const res = await axios.get(`${BASE}/student/dashboard`, { headers: { Authorization: `Bearer ${freshStudentToken}` } });
+    logPass('5b. Student Dashboard API', `Student Name: ${res.data.data.student.name}`);
+  } catch (err) {
+    logFail('5b. Student Dashboard API', err.response?.data?.message || err.message);
   }
 
   // 6. Student Problems List API (Progressive Lock System)
+  // Pick the first problem the student is allowed to open AND hasn't already
+  // submitted (the API enforces one submission per problem), so the suite is
+  // safe to re-run against the same database.
   let targetProblemId = null;
   try {
-    const res = await axios.get(`${BASE}/student/problems`, { headers: { Authorization: `Bearer ${studentToken}` } });
+    const res = await axios.get(`${BASE}/student/problems`, { headers: { Authorization: `Bearer ${freshStudentToken}` } });
     const problems = res.data.data.problems;
-    targetProblemId = problems[0]?.id;
-    logPass('6. Student Problems List API', `Found ${problems.length} problems`);
+    const unlocked = res.data.data.unlocked;
+    const solvedIds = new Set(res.data.data.solvedProblemIds || []);
+    const openProblem = problems.find(p => unlocked[p.difficulty] && !solvedIds.has(p.id));
+    targetProblemId = openProblem?.id;
+    if (!targetProblemId) throw new Error('No unsubmitted unlocked problem available for the fresh student');
+    logPass('6. Student Problems List API', `Found ${problems.length} problems, unlocked: ${JSON.stringify(unlocked)}`);
   } catch (err) {
     logFail('6. Student Problems List API', err.response?.data?.message || err.message);
   }
 
   // 7. Student Single Problem Detail API
   try {
-    const res = await axios.get(`${BASE}/student/problems/${targetProblemId}`, { headers: { Authorization: `Bearer ${studentToken}` } });
+    const res = await axios.get(`${BASE}/student/problems/${targetProblemId}`, { headers: { Authorization: `Bearer ${freshStudentToken}` } });
     logPass('7. Student Problem Detail API', `Title: ${res.data.data.title}`);
   } catch (err) {
     logFail('7. Student Problem Detail API', err.response?.data?.message || err.message);
@@ -97,7 +134,7 @@ async function testFullProduction() {
       problem_id: targetProblemId,
       code,
       language: 'python'
-    }, { headers: { Authorization: `Bearer ${studentToken}` } });
+    }, { headers: { Authorization: `Bearer ${freshStudentToken}` } });
     logPass('8. Student Code Submission & AI Review', `AI Score: ${res.data.data.review.ai_score}%`);
   } catch (err) {
     logFail('8. Student Code Submission & AI Review', err.response?.data?.message || err.message);
@@ -105,7 +142,7 @@ async function testFullProduction() {
 
   // 9. Student Leaderboard API
   try {
-    const res = await axios.get(`${BASE}/student/leaderboard`, { headers: { Authorization: `Bearer ${studentToken}` } });
+    const res = await axios.get(`${BASE}/student/leaderboard`, { headers: { Authorization: `Bearer ${freshStudentToken}` } });
     logPass('9. Student Leaderboard API', `Total Entries: ${res.data.data.length}`);
   } catch (err) {
     logFail('9. Student Leaderboard API', err.response?.data?.message || err.message);
@@ -113,17 +150,19 @@ async function testFullProduction() {
 
   // 10. Student Live Points API
   try {
-    const res = await axios.get(`${BASE}/student/live-points`, { headers: { Authorization: `Bearer ${studentToken}` } });
+    const res = await axios.get(`${BASE}/student/live-points`, { headers: { Authorization: `Bearer ${freshStudentToken}` } });
     logPass('10. Student Live Points API', `Points Record: ${res.data.data ? 'Found' : '0'}`);
   } catch (err) {
     logFail('10. Student Live Points API', err.response?.data?.message || err.message);
   }
 
   // 11. Student Profile API (GET & PUT)
+  // NOTE: updateProfile only supports name/department/year (bio lives in user_profiles and has no update endpoint).
   try {
-    const getRes = await axios.get(`${BASE}/student/profile`, { headers: { Authorization: `Bearer ${studentToken}` } });
-    const putRes = await axios.put(`${BASE}/student/profile`, { bio: 'Passionate developer & student' }, { headers: { Authorization: `Bearer ${studentToken}` } });
-    logPass('11. Student Profile GET & PUT API', `Bio updated: ${putRes.data.data.bio}`);
+    await axios.get(`${BASE}/student/profile`, { headers: { Authorization: `Bearer ${freshStudentToken}` } });
+    const putRes = await axios.put(`${BASE}/student/profile`, { year: '3rd' }, { headers: { Authorization: `Bearer ${freshStudentToken}` } });
+    if (putRes.data.data.year !== '3rd') throw new Error('Year was not updated');
+    logPass('11. Student Profile GET & PUT API', `Year updated: ${putRes.data.data.year}`);
   } catch (err) {
     logFail('11. Student Profile API', err.response?.data?.message || err.message);
   }
@@ -191,6 +230,16 @@ async function testFullProduction() {
     logPass('15. Admin Sessions CRUD API', `Created & Deleted Session ID #${createdSessionId}`);
   } catch (err) {
     logFail('15. Admin Sessions CRUD API', err.response?.data?.message || err.message);
+  }
+
+  // 16. Cleanup — remove the throwaway student created in test 5
+  if (freshStudentId) {
+    try {
+      await axios.delete(`${BASE}/admin/students/${freshStudentId}`, { headers: { Authorization: `Bearer ${adminToken}` } });
+      logPass('16. Cleanup Fresh Test Student', `Deleted ID #${freshStudentId}`);
+    } catch (err) {
+      logFail('16. Cleanup Fresh Test Student', err.response?.data?.message || err.message);
+    }
   }
 
   console.log('\n==========================================');

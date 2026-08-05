@@ -1,11 +1,38 @@
 const axios = require('axios');
 const config = require('../config');
+const crypto = require('crypto');
 
 class NemotronService {
   constructor() {
     this.apiKey = config.nemotron.apiKey;
     this.apiUrl = config.nemotron.apiUrl;
     this.model = config.nemotron.model;
+    this.cache = new Map(); // Simple in-memory cache
+    this.cacheTTL = 5 * 60 * 1000; // 5 minutes
+  }
+
+  getCacheKey(code, language, problemDescription) {
+    return crypto.createHash('md5').update(`${language}:${problemDescription}:${code}`).digest('hex');
+  }
+
+  getCachedReview(code, language, problemDescription) {
+    const key = this.getCacheKey(code, language, problemDescription);
+    const cached = this.cache.get(key);
+    if (cached && Date.now() - cached.timestamp < this.cacheTTL) {
+      return cached.data;
+    }
+    this.cache.delete(key);
+    return null;
+  }
+
+  setCachedReview(code, language, problemDescription, data) {
+    const key = this.getCacheKey(code, language, problemDescription);
+    this.cache.set(key, { data, timestamp: Date.now() });
+    // Limit cache size
+    if (this.cache.size > 100) {
+      const firstKey = this.cache.keys().next().value;
+      this.cache.delete(firstKey);
+    }
   }
 
   buildPrompt(problemDesc, code, language) {
@@ -100,7 +127,14 @@ JSON format:
   }
 
   async reviewCode(problemDescription, code, language) {
-    const maxRetries = 2;
+    // Check cache first
+    const cached = this.getCachedReview(code, language, problemDescription);
+    if (cached) {
+      console.log('Using cached AI review result');
+      return cached;
+    }
+
+    const maxRetries = 1; // Reduced from 2 to 1 for faster failure
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         const response = await axios.post(
@@ -118,21 +152,24 @@ JSON format:
               },
             ],
             temperature: 0.2,
-            max_tokens: 2048,
+            max_tokens: 1024, // Reduced from 2048 for faster response
           },
           {
             headers: {
               Authorization: `Bearer ${this.apiKey}`,
               'Content-Type': 'application/json',
               'HTTP-Referer': 'http://localhost:3000',
-              'X-Title': 'Coding Club',
+              'X-Title': 'CodeAD',
             },
-            timeout: 120000,
+            timeout: 30000, // Reduced from 120000 (120s) to 30000 (30s)
           }
         );
 
         const content = response.data.choices[0].message.content;
-        return this.parseResponse(content);
+        const result = this.parseResponse(content);
+        // Cache the result
+        this.setCachedReview(code, language, problemDescription, result);
+        return result;
       } catch (err) {
         console.error(`OpenRouter API error (attempt ${attempt}/${maxRetries}):`, err.message);
         if (err.response) {
@@ -140,7 +177,7 @@ JSON format:
           console.error('API body:', JSON.stringify(err.response.data));
         }
         if (attempt < maxRetries) {
-          await new Promise(r => setTimeout(r, 3000));
+          await new Promise(r => setTimeout(r, 1000)); // Reduced from 3000 to 1000
           continue;
         }
       }
@@ -159,19 +196,57 @@ JSON format:
     };
   }
 
+  createSyntaxErrorReview(line, message) {
+    return {
+      has_syntax_error: true,
+      syntax_error_line: line,
+      syntax_error_message: message,
+      logical_correctness: 0,
+      ai_score: 0,
+      time_complexity: 'N/A',
+      space_complexity: 'N/A',
+      mistakes: `Syntax error on line ${line}: ${message}`,
+      suggestions: `Fix the syntax error on line ${line}`,
+      syntax_review: `Error on line ${line}: ${message}`,
+      summary: `Syntax error on line ${line} — code cannot run`,
+    };
+  }
+
   async compileCode(problemDescription, code, language, exampleInput = '') {
     const { executeJS, executePython } = require('../shared/utils/codeExecutor');
+    const startTime = Date.now();
+    
+    console.log(`[Compile] Starting compilation for ${language} code...`);
+    
+    // Run local execution first (fast - milliseconds)
     let localExec = null;
-
     if (language === 'javascript') {
       localExec = executeJS(code, exampleInput);
     } else if (language === 'python') {
       localExec = await executePython(code, exampleInput);
     }
+    
+    const localTime = Date.now() - startTime;
+    console.log(`[Compile] Local execution completed in ${localTime}ms`);
 
-    const review = await this.reviewCode(problemDescription, code, language);
+    // Short-circuit: if local execution found syntax error, skip AI review (saves 5-30 seconds)
+    const localSyntaxError = localExec && localExec.executed && localExec.has_syntax_error;
+    
+    let review;
+    if (localSyntaxError) {
+      console.log(`[Compile] Syntax error detected locally, skipping AI review`);
+      // Skip AI review for syntax errors - return immediate response
+      review = this.createSyntaxErrorReview(localExec.syntax_error_line, localExec.syntax_error_message);
+    } else {
+      // No syntax error - run AI review
+      console.log(`[Compile] No syntax error, running AI review...`);
+      review = await this.reviewCode(problemDescription, code, language);
+    }
+    
+    const totalTime = Date.now() - startTime;
+    console.log(`[Compile] Total compilation completed in ${totalTime}ms`);
 
-    const hasSyntaxError = (localExec && localExec.executed && localExec.has_syntax_error) || review.has_syntax_error;
+    const hasSyntaxError = localSyntaxError || review.has_syntax_error;
     const syntaxLine = (localExec && localExec.syntax_error_line) || review.syntax_error_line || 1;
     const syntaxMsg = (localExec && localExec.syntax_error_message) || review.syntax_error_message || 'Syntax Error';
 
