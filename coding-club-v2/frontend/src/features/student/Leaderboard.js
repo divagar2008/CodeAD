@@ -101,7 +101,8 @@ function Podium({ top3 }) {
 
 export default function Leaderboard() {
   const { data, loading } = useFetch('/student/leaderboard');
-  const top3 = data ? data.filter(e => e.rank <= 3) : [];
+  const hasScores = data && data.some(e => e.total_score > 0);
+  const top3 = hasScores ? data.filter(e => e.rank <= 3 && e.total_score > 0) : [];
 
   return (
     <>

@@ -192,7 +192,7 @@ exports.getLeaderboard = async (req, res, next) => {
   try {
     const entries = await prisma.leaderboard.findMany({
       include: { student: { select: { id: true, name: true, email: true, department: true } } },
-      orderBy: { total_score: 'desc' },
+      orderBy: [{ total_score: 'desc' }, { coding_score: 'desc' }, { student_id: 'asc' }],
     });
     ApiResponse.success(res, entries.map((e, i) => ({ rank: i + 1, ...e })));
   } catch (err) { next(err); }
