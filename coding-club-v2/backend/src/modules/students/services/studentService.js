@@ -7,9 +7,13 @@ const { checkAndAwardAchievements } = require('./achievementChecker');
 
 function cleanExampleInput(input) {
   if (!input) return '';
-  // "n=97" → "97"
+  // Handle "n=97" → "97"
   if (/^[a-zA-Z_]\w*\s*=\s*.+/.test(input) && !input.includes(',')) {
     return input.replace(/^[a-zA-Z_]\w*\s*=\s*/, '').trim();
+  }
+  // Handle "nums = [2,7,11,15], target = 9" → "2 7 11 15 9" (flatten for input())
+  if (input.includes('=') && input.includes(',')) {
+    return input.replace(/[a-zA-Z_]\w*\s*=\s*/g, '').replace(/[\[\]]/g, '').replace(/,\s*/g, ' ').trim();
   }
   return input;
 }
