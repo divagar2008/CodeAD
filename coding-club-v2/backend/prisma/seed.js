@@ -5,20 +5,16 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('Seeding...\n');
 
-  const studentPass = await bcrypt.hash('student123', 12);
+  // Check if data already exists (skip if DB is populated)
+  const existingStudents = await prisma.students.count();
+  if (existingStudents > 0) {
+    console.log(`Database already has ${existingStudents} students. Skipping seed.`);
+    console.log('');
+    return;
+  }
 
-  // Clear existing data for a fresh start
-  console.log('Clearing existing data...');
-  await prisma.student_achievements.deleteMany();
-  await prisma.submissions.deleteMany();
-  await prisma.leaderboard.deleteMany();
-  await prisma.live_points.deleteMany();
-  await prisma.user_profiles.deleteMany();
-  await prisma.activity_logs.deleteMany();
-  await prisma.students.deleteMany();
-  await prisma.problems.deleteMany();
-  await prisma.live_sessions.deleteMany();
-  await prisma.achievements.deleteMany();
+  console.log('Database is empty. Seeding initial data...');
+  const studentPass = await bcrypt.hash('student123', 12);
 
   // Students — Artificial Intelligence, 2nd Year
   const students = [
@@ -52,10 +48,10 @@ async function main() {
 
   // Problems
   const problems = [
-    { title: 'Two Sum', description: 'Given an array of integers nums and an integer target, return indices of the two numbers that add up to target.', difficulty: 'easy', constraints: '2 <= nums.length <= 10^4', examples: { input: 'nums = [2,7,11,15], target = 9', output: '[0,1]' } },
+    { title: 'Two Sum', description: 'Given an array of integers nums and an integer target, return indices of the two numbers that add up to target.', difficulty: 'easy', constraints: '2 <= nums.length <= 10^4', examples: { input: '2 7 11 15 9', output: '[0,1]' } },
     { title: 'Reverse String', description: 'Write a function that reverses a string given as a character array.', difficulty: 'easy', examples: { input: 'hello', output: 'olleh' } },
     { title: 'Longest Substring', description: 'Find the length of the longest substring without repeating characters.', difficulty: 'medium', examples: { input: 'abcabcbb', output: '3' } },
-    { title: 'Merge Sorted Arrays', description: 'Merge two sorted arrays into one sorted array in-place.', difficulty: 'medium', examples: { input: '[1,2,3,0,0,0], [2,5,6]', output: '[1,2,2,3,5,6]' } },
+    { title: 'Merge Sorted Arrays', description: 'Merge two sorted arrays into one sorted array in-place.', difficulty: 'medium', examples: { input: '[1,2,3,0,0,0] [2,5,6]', output: '[1,2,2,3,5,6]' } },
     { title: 'Trapping Rain Water', description: 'Compute how much water can be trapped after raining given elevation map.', difficulty: 'hard', examples: { input: '[0,1,0,2,1,0,1,3,2,1,2,1]', output: '6' } },
     { title: 'Binary Tree Max Path', description: 'Find the maximum path sum in a non-empty binary tree.', difficulty: 'hard', examples: { input: '[1,2,3]', output: '6' } },
   ];
@@ -65,7 +61,7 @@ async function main() {
   }
   console.log(`Created ${problems.length} problems`);
 
-  // Live session (no points assigned yet — admin can award them during the demo)
+  // Live session
   await prisma.live_sessions.create({
     data: {
       name: 'Weekly Challenge #1',
@@ -105,7 +101,7 @@ async function main() {
   }
   console.log(`Created ${achievements.length} achievements`);
 
-  console.log('\nDone! All data reset to clean state.\n');
+  console.log('\nDone! Initial data seeded.\n');
   console.log('Admin accounts (password: student123):');
   students.filter(s => s.role === 'admin').forEach(s => console.log(`  - ${s.name} <${s.email}>`));
   console.log('\nStudent accounts (password: student123):');
