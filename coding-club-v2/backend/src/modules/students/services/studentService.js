@@ -133,13 +133,16 @@ exports.compileCode = async (req, res, next) => {
     if (!problem) throw new NotFoundError('Problem not found');
 
     let exampleInput = '';
+    let exampleOutput = '';
     if (problem.examples) {
       if (typeof problem.examples === 'object' && problem.examples.input) {
         exampleInput = problem.examples.input;
+        exampleOutput = problem.examples.output || '';
       } else if (typeof problem.examples === 'string') {
         try {
           const parsed = JSON.parse(problem.examples);
           exampleInput = parsed.input || '';
+          exampleOutput = parsed.output || '';
         } catch (e) {
           exampleInput = problem.examples;
         }
@@ -147,9 +150,10 @@ exports.compileCode = async (req, res, next) => {
     }
 
     exampleInput = cleanExampleInput(exampleInput);
+    exampleOutput = cleanExampleInput(exampleOutput);
 
     const nemotronService = require('../../../ai/nemotronService');
-    const result = await nemotronService.compileCode(problem.description, code, language, exampleInput);
+    const result = await nemotronService.compileCode(problem.description, code, language, exampleInput, exampleOutput);
 
     ApiResponse.success(res, result);
   } catch (err) { next(err); }
@@ -169,7 +173,28 @@ exports.submitCode = async (req, res, next) => {
     }
 
     const nemotronService = require('../../../ai/nemotronService');
-    const review = await nemotronService.reviewCode(problem.description, code, language);
+
+    let exampleInput = '';
+    let exampleOutput = '';
+    if (problem.examples) {
+      if (typeof problem.examples === 'object') {
+        exampleInput = problem.examples.input || '';
+        exampleOutput = problem.examples.output || '';
+      } else if (typeof problem.examples === 'string') {
+        try {
+          const parsed = JSON.parse(problem.examples);
+          exampleInput = parsed.input || '';
+          exampleOutput = parsed.output || '';
+        } catch (e) {
+          exampleInput = problem.examples;
+        }
+      }
+    }
+    exampleInput = cleanExampleInput(exampleInput);
+    exampleOutput = cleanExampleInput(exampleOutput);
+
+    const compileResult = await nemotronService.compileCode(problem.description, code, language, exampleInput, exampleOutput);
+    const review = compileResult.review;
 
     const { calculateScore } = require('../../../shared/utils/helpers');
     const points = calculateScore(problem.difficulty, review.ai_score);

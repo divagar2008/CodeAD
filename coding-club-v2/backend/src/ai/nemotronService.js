@@ -218,7 +218,20 @@ JSON format:
     };
   }
 
-  async compileCode(problemDescription, code, language, exampleInput = '') {
+  outputMatches(actual, expected) {
+    const normalize = (s) => s.replace(/\r/g, '').trim().replace(/\s+/g, ' ');
+    const actualNorm = normalize(actual);
+    const expectedNorm = normalize(expected);
+    if (actualNorm === expectedNorm) return true;
+    const actualLines = actualNorm.split('\n').map(l => l.trim()).filter(Boolean);
+    const expectedLines = expectedNorm.split('\n').map(l => l.trim()).filter(Boolean);
+    if (actualLines.length === expectedLines.length) {
+      return actualLines.every((line, i) => line === expectedLines[i]);
+    }
+    return false;
+  }
+
+  async compileCode(problemDescription, code, language, exampleInput = '', expectedOutput = '') {
     const { executeJS, executePython } = require('../shared/utils/codeExecutor');
     const startTime = Date.now();
     
@@ -244,9 +257,31 @@ JSON format:
       // Skip AI review for syntax errors - return immediate response
       review = this.createSyntaxErrorReview(localExec.syntax_error_line, localExec.syntax_error_message);
     } else {
-      // No syntax error - run AI review
-      console.log(`[Compile] No syntax error, running AI review...`);
-      review = await this.reviewCode(problemDescription, code, language);
+      // Check if output matches expected output
+      const actualOutput = (localExec?.program_output || '').trim();
+      const expected = (expectedOutput || '').trim();
+      
+      if (expected && actualOutput && this.outputMatches(actualOutput, expected)) {
+        console.log(`[Compile] Output matches expected! Auto-scoring 100.`);
+        review = {
+          has_syntax_error: false,
+          syntax_error_line: null,
+          syntax_error_message: '',
+          logical_correctness: 100,
+          ai_score: 100,
+          time_complexity: 'O(N)',
+          space_complexity: 'O(1)',
+          mistakes: 'None',
+          suggestions: 'Perfect solution!',
+          syntax_review: 'No syntax errors',
+          better_coding_practices: 'Logic evaluation completed',
+          summary: 'Perfect solution! Output matches expected.',
+        };
+      } else {
+        // No syntax error, output doesn't match or no expected output - run AI review
+        console.log(`[Compile] No syntax error, running AI review...`);
+        review = await this.reviewCode(problemDescription, code, language);
+      }
     }
     
     const totalTime = Date.now() - startTime;
