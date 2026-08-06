@@ -119,7 +119,7 @@ export default function LoginPage() {
   return (
     <div className="login-page">
       {/* Background image */}
-      <div className="login-bg-image" />
+      <div className="login-bg-image" style={{ backgroundImage: `url(${process.env.PUBLIC_URL}/Background.png)` }} />
 
       {/* Auth card */}
       <AuthForm
