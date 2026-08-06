@@ -73,6 +73,12 @@ exports.studentRegister = async (req, res, next) => {
 
     logActivity(student.id, 'student', 'register');
 
+    // Send welcome email (fire-and-forget)
+    const { sendWelcomeEmail } = require('../../../shared/services/emailService');
+    sendWelcomeEmail(student.name, student.email).catch(err =>
+      console.error('[Email] Welcome email failed:', err.message)
+    );
+
     ApiResponse.success(res, {
       token,
       user: { id: student.id, name: student.name, email: student.email, role: 'student',

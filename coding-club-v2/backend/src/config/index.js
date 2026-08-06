@@ -13,4 +13,9 @@ module.exports = {
     model: process.env.NEMOTRON_MODEL || 'nvidia/nemotron-3-nano-30b-a3b:free',
   },
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+  brevo: {
+    apiKey: process.env.BREVO_API_KEY,
+    senderEmail: process.env.BREVO_SENDER_EMAIL || 'noreply@codead.app',
+    senderName: process.env.BREVO_SENDER_NAME || 'CodeAD',
+  },
 };

@@ -27,6 +27,25 @@ exports.create = async (req, res, next) => {
       data: { title, description, difficulty: difficulty || 'easy', input_description, output_description, constraints, examples },
     });
     logActivity(req.user.id, 'admin', 'create_problem', { id: problem.id });
+
+    // Notify all active students via email (fire-and-forget)
+    const { sendNewProblemNotification } = require('../../../shared/services/emailService');
+    prisma.students.findMany({
+      where: { is_active: true, role: 'student' },
+      select: { name: true, email: true },
+    }).then(students => {
+      console.log(`[Email] Sending problem notification to ${students.length} students...`);
+      const notifications = students.map(s =>
+        sendNewProblemNotification(s.name, s.email, problem).catch(err =>
+          console.error(`[Email] Failed to notify ${s.email}:`, err.message)
+        )
+      );
+      return Promise.allSettled(notifications);
+    }).then(results => {
+      const sent = results.filter(r => r.status === 'fulfilled' && r.value).length;
+      console.log(`[Email] Problem notification sent to ${sent}/${results.length} students`);
+    }).catch(err => console.error('[Email] Notification batch failed:', err.message));
+
     ApiResponse.success(res, problem, 'Created', 201);
   } catch (err) { next(err); }
 };
