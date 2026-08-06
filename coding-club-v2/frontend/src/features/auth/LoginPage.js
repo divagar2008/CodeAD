@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import toast from 'react-hot-toast';
-import ShaderAnimation from '../../components/ui/ShaderAnimation';
 import { AuthForm } from '../../components/ui/AuthForm';
 
 const LogoIcon = () => (
@@ -119,11 +118,8 @@ export default function LoginPage() {
 
   return (
     <div className="login-page">
-      {/* Shader background */}
-      <div className="login-shader-bg">
-        <ShaderAnimation />
-        <div className="login-shader-overlay" />
-      </div>
+      {/* Background image */}
+      <div className="login-bg-image" />
 
       {/* Auth card */}
       <AuthForm
