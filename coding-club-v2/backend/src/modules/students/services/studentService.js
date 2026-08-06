@@ -5,6 +5,15 @@ const { NotFoundError, ConflictError, ValidationError, ForbiddenError } = requir
 const { logActivity, calculateScore } = require('../../../shared/utils/helpers');
 const { checkAndAwardAchievements } = require('./achievementChecker');
 
+function cleanExampleInput(input) {
+  if (!input) return '';
+  // "n=97" → "97"
+  if (/^[a-zA-Z_]\w*\s*=\s*.+/.test(input) && !input.includes(',')) {
+    return input.replace(/^[a-zA-Z_]\w*\s*=\s*/, '').trim();
+  }
+  return input;
+}
+
 exports.getDashboard = async (req, res, next) => {
   try {
     const student = await prisma.students.findUnique({
@@ -132,6 +141,8 @@ exports.compileCode = async (req, res, next) => {
         }
       }
     }
+
+    exampleInput = cleanExampleInput(exampleInput);
 
     const nemotronService = require('../../../ai/nemotronService');
     const result = await nemotronService.compileCode(problem.description, code, language, exampleInput);
