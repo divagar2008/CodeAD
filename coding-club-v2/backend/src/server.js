@@ -58,3 +58,4 @@ app.use((_, res) => res.status(404).json({ success: false, message: 'Not found' 
 app.use(errorHandler);
 
 app.listen(config.port, () => console.log(`Server running on port ${config.port}`));
+
