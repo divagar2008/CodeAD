@@ -5,7 +5,7 @@ import api from '../../lib/api';
 import toast from 'react-hot-toast';
 
 export default function Students() {
-  const { data, loading, refetch } = useFetch('/admin/students');
+  const { data, loading, refetch } = useFetch('/admin/students?limit=200');
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState(null);
