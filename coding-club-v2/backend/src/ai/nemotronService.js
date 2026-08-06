@@ -49,12 +49,18 @@ Analyze:
 1. SYNTAX: missing colons, brackets, semicolons, indentation, unmatched braces
 2. LOGIC: correct algorithm, edge cases, loop bounds, conditions
 
+IMPORTANT SCORING RULES:
+- Do NOT penalize for using input()/print() vs writing a function. The platform provides input automatically — using input()/print() is perfectly acceptable and equivalent to a function.
+- Do NOT penalize for using print() to return the result. That is the expected output format.
+- ONLY judge whether the core logic/algorithm correctly solves the problem.
+- If the logic correctly solves the problem, score 95-100.
+
 If syntax error found: set has_syntax_error true, give exact line number (count from 1).
 If no syntax error: set has_syntax_error false, line null, message empty, then score logic 0-100.
 
 RULES:
 - Syntax error = score 0, code cannot run
-- 90-100: perfect | 70-89: minor gap | 50-69: 2-3 mistakes | 30-49: multiple errors | 0-29: broken
+- 90-100: correct logic | 70-89: minor edge case gap | 50-69: partial logic | 30-49: mostly wrong | 0-29: broken
 
 JSON format:
 {"has_syntax_error":bool,"syntax_error_line":int|null,"syntax_error_message":str,"logical_correctness":int,"time_complexity":str,"space_complexity":str,"mistakes":str,"suggestions":str,"summary":str}`;
