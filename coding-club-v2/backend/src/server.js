@@ -39,7 +39,7 @@ app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 200 }));
 app.use(express.json({ limit: '10mb' }));
 if (config.nodeEnv === 'development') app.use(morgan('dev'));
 
-app.get('/api/health', (_, res) => res.json({ status: 'ok', env: config.nodeEnv }));
+app.get('/api/health', (_, res) => res.json({ status: 'ok', env: config.nodeEnv, version: '2.1.0' }));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/student', studentRoutes);
