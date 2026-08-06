@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: codead
+    runtime: node
+    rootDir: coding-club-v2/backend
+    buildCommand: npm install && npx prisma generate && npx prisma db push --accept-data-loss
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: NODE_ENV
+        value: production
+      - key: FRONTEND_URL
+        value: https://code-ad-iota.vercel.app
