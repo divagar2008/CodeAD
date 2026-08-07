@@ -73,6 +73,13 @@ async function main() {
   for (const s of students) {
     const existing = await prisma.students.findUnique({ where: { email: s.email } });
     if (existing) {
+      if (s.role === 'admin') {
+        const valid = await bcrypt.compare('student123', existing.password);
+        if (!valid) {
+          await prisma.students.update({ where: { email: s.email }, data: { password: studentPass, role: s.role } });
+          console.log(`Updated admin password: ${s.email}`);
+        }
+      }
       skipped++;
       continue;
     }
