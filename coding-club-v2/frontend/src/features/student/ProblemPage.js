@@ -393,6 +393,12 @@ export default function ProblemPage() {
                         </div>
                       ))}
                     </div>
+                    {(review?.line_analysis || existingSubmission?.ai_feedback?.line_analysis) && (
+                      <div className="review-item" style={{ marginTop: 10 }}>
+                        <div className="review-label">Line-by-Line Analysis</div>
+                        <div className="review-value">{review?.line_analysis || existingSubmission?.ai_feedback?.line_analysis}</div>
+                      </div>
+                    )}
                     {(review?.mistakes || existingSubmission?.mistakes) && (
                       <div className="review-item" style={{ marginTop: 10 }}>
                         <div className="review-label">Mistakes</div>

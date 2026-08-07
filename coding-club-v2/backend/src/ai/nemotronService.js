@@ -7,8 +7,8 @@ class NemotronService {
     this.apiKey = config.nemotron.apiKey;
     this.apiUrl = config.nemotron.apiUrl;
     this.model = config.nemotron.model;
-    this.cache = new Map(); // Simple in-memory cache
-    this.cacheTTL = 5 * 60 * 1000; // 5 minutes
+    this.cache = new Map();
+    this.cacheTTL = 5 * 60 * 1000;
   }
 
   getCacheKey(code, language, problemDescription) {
@@ -28,47 +28,85 @@ class NemotronService {
   setCachedReview(code, language, problemDescription, data) {
     const key = this.getCacheKey(code, language, problemDescription);
     this.cache.set(key, { data, timestamp: Date.now() });
-    // Limit cache size
     if (this.cache.size > 100) {
       const firstKey = this.cache.keys().next().value;
       this.cache.delete(firstKey);
     }
   }
 
-  buildPrompt(problemDesc, code, language) {
-    return `Check this ${language} code for a coding problem. Return ONLY valid JSON, no markdown, no extra text.
+  buildReviewPrompt(problemDesc, code, language, actualOutput = '', expectedOutput = '') {
+    return `You are a strict code review engine. Analyze EVERY LINE of the submitted ${language} code. Return ONLY valid JSON, no markdown, no extra text.
 
-PROBLEM: ${problemDesc}
+PROBLEM DESCRIPTION:
+${problemDesc}
 
-CODE:
-\`\`\`${language}
+SUBMITTED CODE (${language}):
 ${code}
-\`\`\`
 
-Analyze:
-1. SYNTAX: missing colons, brackets, semicolons, indentation, unmatched braces
-2. LOGIC: correct algorithm, edge cases, loop bounds, conditions
+${actualOutput ? `ACTUAL PROGRAM OUTPUT (what the code produced):\n${actualOutput}` : ''}
+${expectedOutput ? `EXPECTED OUTPUT (what the correct answer should be):\n${expectedOutput}` : ''}
 
-IMPORTANT SCORING RULES:
-- Do NOT penalize for using input()/print() vs writing a function. The platform provides input automatically — using input()/print() is perfectly acceptable and equivalent to a function.
-- Do NOT penalize for using print() to return the result. That is the expected output format.
-- ONLY judge whether the core logic/algorithm correctly solves the problem.
-- If the logic correctly solves the problem, score 95-100.
+YOUR TASK — Follow these steps IN ORDER:
 
-If syntax error found: set has_syntax_error true, give exact line number (count from 1).
-If no syntax error: set has_syntax_error false, line null, message empty, then score logic 0-100.
+STEP 1: SYNTAX CHECK
+Go through each line. Check for:
+- Missing colons (Python), semicolons (Java/C++), brackets, braces
+- Unmatched parentheses, brackets, braces
+- Indentation errors (Python)
+- Missing/extra commas, incorrect operators
+- Undefined variables, wrong function calls
+If syntax error found → set has_syntax_error true, give EXACT line number (count from line 1), describe the error precisely.
 
-RULES:
-- Syntax error = score 0, code cannot run
-- 90-100: correct logic | 70-89: minor edge case gap | 50-69: partial logic | 30-49: mostly wrong | 0-29: broken
+STEP 2: LINE-BY-LINE LOGICAL ANALYSIS
+Go through EVERY meaningful line (skip blank lines and comments). For each line explain:
+- What this line does
+- Whether it correctly contributes to solving the problem
+- Any edge cases or bugs in this line
+Track each line's correctness.
 
-JSON format:
-{"has_syntax_error":bool,"syntax_error_line":int|null,"syntax_error_message":str,"logical_correctness":int,"time_complexity":str,"space_complexity":str,"mistakes":str,"suggestions":str,"summary":str}`;
+STEP 3: ALGORITHM ANALYSIS
+- Identify the algorithm used (brute force, two pointers, dynamic programming, etc.)
+- Is this the right approach for this problem?
+- Does it handle all edge cases? (empty input, single element, max values, negative numbers, duplicates)
+- Are loop boundaries correct?
+- Are conditions correct?
+- Does the output match the expected output?
+
+STEP 4: COMPLEXITY ANALYSIS
+- Time complexity with justification
+- Space complexity with justification
+
+STEP 5: SCORING
+Score the code 0-100 based on:
+- 90-100: Logic is correct, handles edge cases, clean code
+- 70-89: Core logic works but minor gaps (missing edge case, slightly inefficient)
+- 50-69: Partially correct, some logic issues
+- 30-49: Major logic errors, wrong algorithm
+- 0-29: Completely broken or unrelated to the problem
+
+CRITICAL RULES:
+- Do NOT penalize for using input()/print() (Python) or console.log/readline (JavaScript). The platform feeds input automatically and expects print/console.log output.
+- Do NOT penalize for not writing a function. Using top-level code with input()/print() is the expected format.
+- If the actual output matches expected output, the logic IS correct — score accordingly high.
+- Focus ONLY on whether the code correctly solves the problem.
+
+Return EXACTLY this JSON:
+{
+  "has_syntax_error": bool,
+  "syntax_error_line": int or null,
+  "syntax_error_message": "string",
+  "logical_correctness": int (0-100),
+  "time_complexity": "string like O(N)",
+  "space_complexity": "string like O(1)",
+  "line_analysis": "string — brief summary of line-by-line findings",
+  "mistakes": "string — list specific bugs/issues found",
+  "suggestions": "string — specific improvements",
+  "summary": "string — 1-2 sentence overall assessment"
+}`;
   }
 
   parseResponse(content) {
     let raw = content || '';
-    // Strip markdown code block fences if present
     raw = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
 
     const match = raw.match(/\{[\s\S]*\}/);
@@ -76,7 +114,6 @@ JSON format:
 
     let data = null;
     try {
-      // Clean trailing commas before closing braces/brackets and control characters
       const cleaned = jsonStr
         .replace(/,\s*([\}\]])/g, '$1')
         .replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ');
@@ -85,7 +122,6 @@ JSON format:
       try {
         data = JSON.parse(jsonStr);
       } catch (e2) {
-        // Fallback regex extractor for LLM response format
         console.warn('Using regex fallback to parse LLM response format');
         const hasErr = /"has_syntax_error"\s*:\s*true/i.test(jsonStr);
         const lineMatch = jsonStr.match(/"syntax_error_line"\s*:\s*(\d+)/i);
@@ -96,6 +132,7 @@ JSON format:
         const mistakesMatch = jsonStr.match(/"mistakes"\s*:\s*"([^"]+)"/i);
         const suggestionsMatch = jsonStr.match(/"suggestions"\s*:\s*"([^"]+)"/i);
         const summaryMatch = jsonStr.match(/"summary"\s*:\s*"([^"]+)"/i);
+        const lineAnalysisMatch = jsonStr.match(/"line_analysis"\s*:\s*"([^"]+)"/i);
 
         data = {
           has_syntax_error: hasErr,
@@ -107,6 +144,7 @@ JSON format:
           mistakes: mistakesMatch ? mistakesMatch[1] : (hasErr ? 'Syntax error in code' : 'Logic gaps detected'),
           suggestions: suggestionsMatch ? suggestionsMatch[1] : 'Check algorithm logic',
           summary: summaryMatch ? summaryMatch[1] : 'Review complete',
+          line_analysis: lineAnalysisMatch ? lineAnalysisMatch[1] : 'Line analysis not available',
         };
       }
     }
@@ -124,6 +162,7 @@ JSON format:
       ai_score: score,
       time_complexity: data.time_complexity || 'N/A',
       space_complexity: data.space_complexity || 'N/A',
+      line_analysis: data.line_analysis || 'N/A',
       mistakes: hasSyntaxError ? `Syntax error on line ${syntaxErrorLine}: ${syntaxErrorMessage}` : (data.mistakes || 'No mistakes recorded'),
       suggestions: hasSyntaxError ? `Fix the syntax error on line ${syntaxErrorLine}` : (data.suggestions || 'No suggestions recorded'),
       syntax_review: hasSyntaxError ? `Error on line ${syntaxErrorLine}: ${syntaxErrorMessage}` : 'No syntax errors',
@@ -132,15 +171,14 @@ JSON format:
     };
   }
 
-  async reviewCode(problemDescription, code, language) {
-    // Check cache first
+  async reviewCode(problemDescription, code, language, actualOutput = '', expectedOutput = '') {
     const cached = this.getCachedReview(code, language, problemDescription);
     if (cached) {
       console.log('Using cached AI review result');
       return cached;
     }
 
-    const maxRetries = 1; // Reduced from 2 to 1 for faster failure
+    const maxRetries = 2;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         const response = await axios.post(
@@ -150,15 +188,15 @@ JSON format:
             messages: [
               {
                 role: 'system',
-                content: 'You are a code reviewer. Check syntax then logic. Return ONLY valid JSON, no markdown fences, no explanation text.',
+                content: 'You are an expert code review engine. You analyze code line by line, check syntax, verify logic against the problem description, and score accuracy. You ALWAYS return valid JSON. You never skip lines. You never give generic answers — every analysis is specific to the exact code submitted.',
               },
               {
                 role: 'user',
-                content: this.buildPrompt(problemDescription, code, language),
+                content: this.buildReviewPrompt(problemDescription, code, language, actualOutput, expectedOutput),
               },
             ],
-            temperature: 0.2,
-            max_tokens: 1024, // Reduced from 2048 for faster response
+            temperature: 0.1,
+            max_tokens: 2048,
           },
           {
             headers: {
@@ -167,13 +205,12 @@ JSON format:
               'HTTP-Referer': 'http://localhost:3000',
               'X-Title': 'CodeAD',
             },
-            timeout: 30000, // Reduced from 120000 (120s) to 30000 (30s)
+            timeout: 60000,
           }
         );
 
         const content = response.data.choices[0].message.content;
         const result = this.parseResponse(content);
-        // Cache the result
         this.setCachedReview(code, language, problemDescription, result);
         return result;
       } catch (err) {
@@ -183,7 +220,7 @@ JSON format:
           console.error('API body:', JSON.stringify(err.response.data));
         }
         if (attempt < maxRetries) {
-          await new Promise(r => setTimeout(r, 1000)); // Reduced from 3000 to 1000
+          await new Promise(r => setTimeout(r, 2000));
           continue;
         }
       }
@@ -195,6 +232,9 @@ JSON format:
       logical_correctness: 0,
       ai_score: 0,
       time_complexity: 'N/A',
+      space_complexity: 'N/A',
+      line_analysis: 'N/A',
+      mistakes: 'AI service unavailable',
       suggestions: 'Please try submitting again in a moment.',
       syntax_review: 'N/A',
       better_coding_practices: 'N/A',
@@ -211,6 +251,7 @@ JSON format:
       ai_score: 0,
       time_complexity: 'N/A',
       space_complexity: 'N/A',
+      line_analysis: `Syntax error on line ${line} prevents further analysis`,
       mistakes: `Syntax error on line ${line}: ${message}`,
       suggestions: `Fix the syntax error on line ${line}`,
       syntax_review: `Error on line ${line}: ${message}`,
@@ -234,56 +275,47 @@ JSON format:
   async compileCode(problemDescription, code, language, exampleInput = '', expectedOutput = '') {
     const { executeJS, executePython } = require('../shared/utils/codeExecutor');
     const startTime = Date.now();
-    
+
     console.log(`[Compile] Starting compilation for ${language} code...`);
-    
-    // Run local execution first (fast - milliseconds)
+
     let localExec = null;
     if (language === 'javascript') {
       localExec = executeJS(code, exampleInput);
     } else if (language === 'python') {
       localExec = await executePython(code, exampleInput);
     }
-    
+
     const localTime = Date.now() - startTime;
     console.log(`[Compile] Local execution completed in ${localTime}ms`);
 
-    // Short-circuit: if local execution found syntax error, skip AI review (saves 5-30 seconds)
     const localSyntaxError = localExec && localExec.executed && localExec.has_syntax_error;
-    
+
     let review;
     if (localSyntaxError) {
       console.log(`[Compile] Syntax error detected locally, skipping AI review`);
-      // Skip AI review for syntax errors - return immediate response
       review = this.createSyntaxErrorReview(localExec.syntax_error_line, localExec.syntax_error_message);
     } else {
-      // Check if output matches expected output
       const actualOutput = (localExec?.program_output || '').trim();
       const expected = (expectedOutput || '').trim();
-      
+
+      console.log(`[Compile] Running AI line-by-line review...`);
+      review = await this.reviewCode(problemDescription, code, language, actualOutput, expected);
+
       if (expected && actualOutput && this.outputMatches(actualOutput, expected)) {
-        console.log(`[Compile] Output matches expected! Auto-scoring 100.`);
-        review = {
-          has_syntax_error: false,
-          syntax_error_line: null,
-          syntax_error_message: '',
-          logical_correctness: 100,
-          ai_score: 100,
-          time_complexity: 'O(N)',
-          space_complexity: 'O(1)',
-          mistakes: 'None',
-          suggestions: 'Perfect solution!',
-          syntax_review: 'No syntax errors',
-          better_coding_practices: 'Logic evaluation completed',
-          summary: 'Perfect solution! Output matches expected.',
-        };
+        console.log(`[Compile] Output matches expected!`);
+        review.output_matches_expected = true;
+        if (review.ai_score < 95) {
+          review.ai_score = 100;
+          review.logical_correctness = 100;
+          review.summary = 'Perfect solution! Output matches expected.';
+          review.mistakes = 'None';
+          review.suggestions = 'Perfect solution!';
+        }
       } else {
-        // No syntax error, output doesn't match or no expected output - run AI review
-        console.log(`[Compile] No syntax error, running AI review...`);
-        review = await this.reviewCode(problemDescription, code, language);
+        review.output_matches_expected = false;
       }
     }
-    
+
     const totalTime = Date.now() - startTime;
     console.log(`[Compile] Total compilation completed in ${totalTime}ms`);
 
@@ -303,7 +335,8 @@ JSON format:
       errorLog = `[Compilation Error] Line ${syntaxLine}: ${syntaxMsg}\n${review.syntax_review || ''}`;
       outputLog = `Compilation Failed!\nFound syntax error on line ${syntaxLine}: ${syntaxMsg}`;
     } else {
-      outputLog = `=================== PROGRAM STDOUT / OUTPUT ===================\n${programOutput}\n===============================================================\n\n[Compilation Details]\n- Language: ${language}\n- Time Complexity: ${review.time_complexity}\n- Space Complexity: ${review.space_complexity}\n- Status: Ready for submission`;
+      const outputStatus = review.output_matches_expected ? '✓ Output matches expected' : '✗ Output does not match expected';
+      outputLog = `=================== PROGRAM STDOUT / OUTPUT ===================\n${programOutput}\n===============================================================\n\n[Compilation Details]\n- Language: ${language}\n- Output Status: ${outputStatus}\n- Time Complexity: ${review.time_complexity}\n- Space Complexity: ${review.space_complexity}\n- AI Score: ${review.ai_score}/100\n- Status: ${review.output_matches_expected ? 'Perfect match' : 'Ready for submission'}`;
       errorLog = 'No compilation errors. Code is ready for submission.';
     }
 
