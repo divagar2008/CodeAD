@@ -49,25 +49,6 @@ app.get('/api/health', (_, res) => res.json({
   frontendUrl: config.frontendUrl,
 }));
 
-app.get('/api/test-gemini', async (_, res) => {
-  try {
-    const axios = require('axios');
-    const apiKey = config.gemini.apiKey;
-    const model = config.gemini.model;
-    if (!apiKey) return res.json({ ok: false, error: 'GEMINI_API_KEY not set' });
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-    const response = await axios.post(url, {
-      contents: [{ parts: [{ text: 'Say hello in 5 words' }] }],
-      generationConfig: { maxOutputTokens: 50 },
-    }, { headers: { 'Content-Type': 'application/json' }, timeout: 15000 });
-    const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    res.json({ ok: true, model, text });
-  } catch (err) {
-    const errMsg = err.response ? JSON.stringify(err.response.data) : err.message;
-    res.json({ ok: false, error: errMsg });
-  }
-});
-
 app.use('/api/auth', authRoutes);
 app.use('/api/student', studentRoutes);
 app.use('/api/admin', adminRoutes);
