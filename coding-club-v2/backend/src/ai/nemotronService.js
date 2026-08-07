@@ -35,74 +35,40 @@ class NemotronService {
   }
 
   buildReviewPrompt(problemDesc, code, language, actualOutput = '', expectedOutput = '') {
-    return `You are a strict code review engine. Analyze EVERY LINE of the submitted ${language} code. Return ONLY valid JSON, no markdown, no extra text.
+    const outputMatches = this.outputMatches(actualOutput, expectedOutput);
 
-PROBLEM DESCRIPTION:
-${problemDesc}
+    return `You are a strict code reviewer. Review this ${language} code. Return ONLY a JSON object.
 
-SUBMITTED CODE (${language}):
+PROBLEM: ${problemDesc}
+
+CODE:
 ${code}
 
-${actualOutput ? `ACTUAL PROGRAM OUTPUT (what the code produced):\n${actualOutput}` : ''}
-${expectedOutput ? `EXPECTED OUTPUT (what the correct answer should be):\n${expectedOutput}` : ''}
+${actualOutput ? `ACTUAL OUTPUT: ${actualOutput}` : ''}
+${expectedOutput ? `EXPECTED OUTPUT: ${expectedOutput}` : ''}
+OUTPUT MATCHES: ${outputMatches ? 'YES' : 'NO'}
 
-YOUR TASK — Follow these steps IN ORDER:
+INSTRUCTIONS:
+1. Check each line for syntax errors (missing brackets, colons, semicolons, indentation, undefined variables)
+2. Check each line for logic errors (wrong conditions, off-by-one, missing edge cases)
+3. Analyze the algorithm approach and complexity
+4. If OUTPUT MATCHES is NO, identify WHY the output is wrong and deduct points
+5. If OUTPUT MATCHES is YES but code has issues (wrong approach, missing edge cases), still deduct points
 
-STEP 1: SYNTAX CHECK
-Go through each line. Check for:
-- Missing colons (Python), semicolons (Java/C++), brackets, braces
-- Unmatched parentheses, brackets, braces
-- Indentation errors (Python)
-- Missing/extra commas, incorrect operators
-- Undefined variables, wrong function calls
-If syntax error found → set has_syntax_error true, give EXACT line number (count from line 1), describe the error precisely.
+SCORING RULES:
+- 90-100: Code is correct, handles edge cases, clean logic
+- 70-89: Works for given input but misses edge cases or uses inefficient approach
+- 50-69: Partially works, has logic gaps
+- 30-49: Major logic errors
+- 0-29: Completely broken
 
-STEP 2: LINE-BY-LINE LOGICAL ANALYSIS
-Go through EVERY meaningful line (skip blank lines and comments). For each line explain:
-- What this line does
-- Whether it correctly contributes to solving the problem
-- Any edge cases or bugs in this line
-Track each line's correctness.
+IMPORTANT:
+- Do NOT give 100 if output does NOT match expected
+- Do NOT give high scores just because code "looks right" — verify the logic actually works
+- Be strict. If there is ANY bug, deduct points.
 
-STEP 3: ALGORITHM ANALYSIS
-- Identify the algorithm used (brute force, two pointers, dynamic programming, etc.)
-- Is this the right approach for this problem?
-- Does it handle all edge cases? (empty input, single element, max values, negative numbers, duplicates)
-- Are loop boundaries correct?
-- Are conditions correct?
-- Does the output match the expected output?
-
-STEP 4: COMPLEXITY ANALYSIS
-- Time complexity with justification
-- Space complexity with justification
-
-STEP 5: SCORING
-Score the code 0-100 based on:
-- 90-100: Logic is correct, handles edge cases, clean code
-- 70-89: Core logic works but minor gaps (missing edge case, slightly inefficient)
-- 50-69: Partially correct, some logic issues
-- 30-49: Major logic errors, wrong algorithm
-- 0-29: Completely broken or unrelated to the problem
-
-CRITICAL RULES:
-- Do NOT penalize for using input()/print() (Python) or console.log/readline (JavaScript). The platform feeds input automatically and expects print/console.log output.
-- Do NOT penalize for not writing a function. Using top-level code with input()/print() is the expected format.
-- If the actual output matches expected output, the logic IS correct — score accordingly high.
-- Focus ONLY on whether the code correctly solves the problem.
-
-Return EXACTLY this JSON:
-{
-  "has_syntax_error": bool,
-  "syntax_error_line": int or null,
-  "syntax_error_message": "string",
-  "logical_correctness": int (0-100),
-  "time_complexity": "string like O(N)",
-  "space_complexity": "string like O(1)",
-  "line_analysis": "string — brief summary of line-by-line findings",
-  "mistakes": "string — list specific bugs/issues found",
-  "suggestions": "string — specific improvements",
-  "summary": "string — 1-2 sentence overall assessment"
-}`;
+Return ONLY this JSON (no markdown, no explanation):
+{"has_syntax_error":bool,"syntax_error_line":int|null,"syntax_error_message":"string","logical_correctness":int,"time_complexity":"string","space_complexity":"string","line_analysis":"string — what each line does and if correct","mistakes":"string — specific bugs found","suggestions":"string — how to fix","summary":"string — overall assessment"}`;
   }
 
   parseResponse(content) {
