@@ -9,7 +9,7 @@ module.exports = {
   },
   gemini: {
     apiKey: process.env.GEMINI_API_KEY,
-    model: process.env.GEMINI_MODEL || 'gemini-3.5-flash',
+    model: process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite',
   },
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
   brevo: {
