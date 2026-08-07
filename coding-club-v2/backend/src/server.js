@@ -42,8 +42,9 @@ if (config.nodeEnv === 'development') app.use(morgan('dev'));
 app.get('/api/health', (_, res) => res.json({
   status: 'ok',
   env: config.nodeEnv,
-  version: '2.2.0',
+  version: '2.3.0',
   emailConfigured: !!(config.brevo.apiKey && config.brevo.apiKey !== 'your_brevo_api_key_here'),
+  geminiConfigured: !!(config.gemini && config.gemini.apiKey),
   frontendUrl: config.frontendUrl,
 }));
 
