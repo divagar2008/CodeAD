@@ -2,11 +2,11 @@ const axios = require('axios');
 const config = require('../config');
 const crypto = require('crypto');
 
-class NemotronService {
+class GeminiService {
   constructor() {
-    this.apiKey = config.nemotron.apiKey;
-    this.apiUrl = config.nemotron.apiUrl;
-    this.model = config.nemotron.model;
+    this.apiKey = config.gemini.apiKey;
+    this.model = config.gemini.model;
+    this.apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent`;
     this.cache = new Map();
     this.cacheTTL = 5 * 60 * 1000;
   }
@@ -66,52 +66,28 @@ IMPORTANT:
 - Do NOT give 100 if output does NOT match expected
 - Do NOT give high scores just because code "looks right" — verify the logic actually works
 - Be strict. If there is ANY bug, deduct points.
+- Do NOT penalize for using input()/print() in Python or console.log in JavaScript. The platform feeds input automatically.
 
 Return ONLY this JSON (no markdown, no explanation):
 {"has_syntax_error":bool,"syntax_error_line":int|null,"syntax_error_message":"string","logical_correctness":int,"time_complexity":"string","space_complexity":"string","line_analysis":"string — what each line does and if correct","mistakes":"string — specific bugs found","suggestions":"string — how to fix","summary":"string — overall assessment"}`;
   }
 
-  parseResponse(content) {
-    let raw = content || '';
-    raw = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
-
-    const match = raw.match(/\{[\s\S]*\}/);
-    let jsonStr = match ? match[0] : raw;
-
+  parseResponse(text) {
     let data = null;
     try {
-      const cleaned = jsonStr
-        .replace(/,\s*([\}\]])/g, '$1')
-        .replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ');
-      data = JSON.parse(cleaned);
-    } catch (e1) {
-      try {
-        data = JSON.parse(jsonStr);
-      } catch (e2) {
-        console.warn('Using regex fallback to parse LLM response format');
-        const hasErr = /"has_syntax_error"\s*:\s*true/i.test(jsonStr);
-        const lineMatch = jsonStr.match(/"syntax_error_line"\s*:\s*(\d+)/i);
-        const scoreMatch = jsonStr.match(/"logical_correctness"\s*:\s*(\d+)/i);
-        const msgMatch = jsonStr.match(/"syntax_error_message"\s*:\s*"([^"]+)"/i);
-        const timeMatch = jsonStr.match(/"time_complexity"\s*:\s*"([^"]+)"/i);
-        const spaceMatch = jsonStr.match(/"space_complexity"\s*:\s*"([^"]+)"/i);
-        const mistakesMatch = jsonStr.match(/"mistakes"\s*:\s*"([^"]+)"/i);
-        const suggestionsMatch = jsonStr.match(/"suggestions"\s*:\s*"([^"]+)"/i);
-        const summaryMatch = jsonStr.match(/"summary"\s*:\s*"([^"]+)"/i);
-        const lineAnalysisMatch = jsonStr.match(/"line_analysis"\s*:\s*"([^"]+)"/i);
-
-        data = {
-          has_syntax_error: hasErr,
-          syntax_error_line: lineMatch ? Number(lineMatch[1]) : null,
-          syntax_error_message: msgMatch ? msgMatch[1] : (hasErr ? 'Syntax error detected' : ''),
-          logical_correctness: scoreMatch ? Number(scoreMatch[1]) : 0,
-          time_complexity: timeMatch ? timeMatch[1] : 'O(N)',
-          space_complexity: spaceMatch ? spaceMatch[1] : 'O(1)',
-          mistakes: mistakesMatch ? mistakesMatch[1] : (hasErr ? 'Syntax error in code' : 'Logic gaps detected'),
-          suggestions: suggestionsMatch ? suggestionsMatch[1] : 'Check algorithm logic',
-          summary: summaryMatch ? summaryMatch[1] : 'Review complete',
-          line_analysis: lineAnalysisMatch ? lineAnalysisMatch[1] : 'Line analysis not available',
-        };
+      data = JSON.parse(text);
+    } catch (e) {
+      console.warn('Gemini response was not valid JSON, attempting parse...');
+      const match = text.match(/\{[\s\S]*\}/);
+      if (match) {
+        try {
+          data = JSON.parse(match[0].replace(/,\s*([\}\]])/g, '$1'));
+        } catch (e2) {
+          console.error('Failed to parse Gemini response:', text.substring(0, 200));
+          return this.getDefaultReview();
+        }
+      } else {
+        return this.getDefaultReview();
       }
     }
 
@@ -137,6 +113,24 @@ Return ONLY this JSON (no markdown, no explanation):
     };
   }
 
+  getDefaultReview() {
+    return {
+      has_syntax_error: false,
+      syntax_error_line: null,
+      syntax_error_message: '',
+      logical_correctness: 0,
+      ai_score: 0,
+      time_complexity: 'N/A',
+      space_complexity: 'N/A',
+      line_analysis: 'N/A',
+      mistakes: 'Could not parse AI response',
+      suggestions: 'Please try again',
+      syntax_review: 'N/A',
+      better_coding_practices: 'N/A',
+      summary: 'AI review could not be completed.',
+    };
+  }
+
   async reviewCode(problemDescription, code, language, actualOutput = '', expectedOutput = '') {
     const cached = this.getCachedReview(code, language, problemDescription);
     if (cached) {
@@ -148,42 +142,43 @@ Return ONLY this JSON (no markdown, no explanation):
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         const response = await axios.post(
-          this.apiUrl,
+          `${this.apiUrl}?key=${this.apiKey}`,
           {
-            model: this.model,
-            messages: [
-              {
-                role: 'system',
-                content: 'You are an expert code review engine. You analyze code line by line, check syntax, verify logic against the problem description, and score accuracy. You ALWAYS return valid JSON. You never skip lines. You never give generic answers — every analysis is specific to the exact code submitted.',
-              },
-              {
-                role: 'user',
-                content: this.buildReviewPrompt(problemDescription, code, language, actualOutput, expectedOutput),
-              },
-            ],
-            temperature: 0.1,
-            max_tokens: 2048,
+            contents: [{
+              parts: [{
+                text: `You are a strict code reviewer. Review code and return ONLY valid JSON. Be strict — if output does not match expected, deduct points. Do not give 100 if there are bugs.\n\n${this.buildReviewPrompt(problemDescription, code, language, actualOutput, expectedOutput)}`
+              }]
+            }],
+            generationConfig: {
+              responseMimeType: 'application/json',
+              temperature: 0.1,
+              maxOutputTokens: 2048,
+            },
           },
           {
-            headers: {
-              Authorization: `Bearer ${this.apiKey}`,
-              'Content-Type': 'application/json',
-              'HTTP-Referer': 'http://localhost:3000',
-              'X-Title': 'CodeAD',
-            },
+            headers: { 'Content-Type': 'application/json' },
             timeout: 60000,
           }
         );
 
-        const content = response.data.choices[0].message.content;
-        const result = this.parseResponse(content);
+        const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        if (!text) {
+          console.error('Empty Gemini response:', JSON.stringify(response.data).substring(0, 300));
+          if (attempt < maxRetries) {
+            await new Promise(r => setTimeout(r, 2000));
+            continue;
+          }
+          return this.getDefaultReview();
+        }
+
+        const result = this.parseResponse(text);
         this.setCachedReview(code, language, problemDescription, result);
         return result;
       } catch (err) {
-        console.error(`OpenRouter API error (attempt ${attempt}/${maxRetries}):`, err.message);
+        console.error(`Gemini API error (attempt ${attempt}/${maxRetries}):`, err.message);
         if (err.response) {
           console.error('API status:', err.response.status);
-          console.error('API body:', JSON.stringify(err.response.data));
+          console.error('API body:', JSON.stringify(err.response.data).substring(0, 300));
         }
         if (attempt < maxRetries) {
           await new Promise(r => setTimeout(r, 2000));
@@ -191,21 +186,7 @@ Return ONLY this JSON (no markdown, no explanation):
         }
       }
     }
-    return {
-      has_syntax_error: false,
-      syntax_error_line: null,
-      syntax_error_message: '',
-      logical_correctness: 0,
-      ai_score: 0,
-      time_complexity: 'N/A',
-      space_complexity: 'N/A',
-      line_analysis: 'N/A',
-      mistakes: 'AI service unavailable',
-      suggestions: 'Please try submitting again in a moment.',
-      syntax_review: 'N/A',
-      better_coding_practices: 'N/A',
-      summary: 'AI service is currently unavailable.',
-    };
+    return this.getDefaultReview();
   }
 
   createSyntaxErrorReview(line, message) {
@@ -264,7 +245,7 @@ Return ONLY this JSON (no markdown, no explanation):
       const actualOutput = (localExec?.program_output || '').trim();
       const expected = (expectedOutput || '').trim();
 
-      console.log(`[Compile] Running AI line-by-line review...`);
+      console.log(`[Compile] Running AI review via Gemini...`);
       review = await this.reviewCode(problemDescription, code, language, actualOutput, expected);
 
       if (expected && actualOutput && this.outputMatches(actualOutput, expected)) {
@@ -312,4 +293,4 @@ Return ONLY this JSON (no markdown, no explanation):
   }
 }
 
-module.exports = new NemotronService();
+module.exports = new GeminiService();
