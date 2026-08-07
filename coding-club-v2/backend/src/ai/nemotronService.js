@@ -302,15 +302,8 @@ Return EXACTLY this JSON:
       review = await this.reviewCode(problemDescription, code, language, actualOutput, expected);
 
       if (expected && actualOutput && this.outputMatches(actualOutput, expected)) {
-        console.log(`[Compile] Output matches expected!`);
+        console.log(`[Compile] Output matches expected.`);
         review.output_matches_expected = true;
-        if (review.ai_score < 95) {
-          review.ai_score = 100;
-          review.logical_correctness = 100;
-          review.summary = 'Perfect solution! Output matches expected.';
-          review.mistakes = 'None';
-          review.suggestions = 'Perfect solution!';
-        }
       } else {
         review.output_matches_expected = false;
       }
@@ -336,7 +329,7 @@ Return EXACTLY this JSON:
       outputLog = `Compilation Failed!\nFound syntax error on line ${syntaxLine}: ${syntaxMsg}`;
     } else {
       const outputStatus = review.output_matches_expected ? '✓ Output matches expected' : '✗ Output does not match expected';
-      outputLog = `=================== PROGRAM STDOUT / OUTPUT ===================\n${programOutput}\n===============================================================\n\n[Compilation Details]\n- Language: ${language}\n- Output Status: ${outputStatus}\n- Time Complexity: ${review.time_complexity}\n- Space Complexity: ${review.space_complexity}\n- AI Score: ${review.ai_score}/100\n- Status: ${review.output_matches_expected ? 'Perfect match' : 'Ready for submission'}`;
+      outputLog = `=================== PROGRAM STDOUT / OUTPUT ===================\n${programOutput}\n===============================================================\n\n[Compilation Details]\n- Language: ${language}\n- Output Status: ${outputStatus}\n- AI Score: ${review.ai_score}/100\n- Time Complexity: ${review.time_complexity}\n- Space Complexity: ${review.space_complexity}\n- Line Analysis: ${review.line_analysis || 'N/A'}\n- Status: ${review.output_matches_expected ? 'Output matches' : 'Code needs review'}`;
       errorLog = 'No compilation errors. Code is ready for submission.';
     }
 
