@@ -32,7 +32,7 @@ export default function Students() {
     catch { toast.error('Failed'); }
   };
 
-  const list = (data || []).filter(s => !search || s.name.toLowerCase().includes(search.toLowerCase()) || s.email.toLowerCase().includes(search.toLowerCase())).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const list = (data || []).filter(s => !search || s.name.toLowerCase().includes(search.toLowerCase()) || s.email.toLowerCase().includes(search.toLowerCase())).sort((a, b) => (a.name || '').replace(/\s/g, '').localeCompare((b.name || '').replace(/\s/g, ''), undefined, { sensitivity: 'base' }));
 
   return (
     <>

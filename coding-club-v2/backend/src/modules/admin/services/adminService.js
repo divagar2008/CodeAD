@@ -13,12 +13,15 @@ exports.getStudents = async (req, res, next) => {
     if (department) where.department = department;
     if (year) where.year = year;
 
-    const [data, total] = await Promise.all([
-      prisma.students.findMany({ where, skip, take: Number(limit), orderBy: { name: 'asc' },
+    const sortByName = (a, b) => (a.name || '').replace(/\s/g, '').localeCompare((b.name || '').replace(/\s/g, ''), undefined, { sensitivity: 'base' });
+
+    const [allData, total] = await Promise.all([
+      prisma.students.findMany({ where,
         select: { id: true, name: true, email: true, department: true, year: true,
           coding_score: true, total_points: true, problems_solved: true, is_active: true, created_at: true } }),
       prisma.students.count({ where }),
     ]);
+    const data = allData.sort(sortByName).slice(skip, skip + Number(limit));
     ApiResponse.paginated(res, data, total, page, limit);
   } catch (err) { next(err); }
 };
