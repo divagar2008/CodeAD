@@ -45,8 +45,28 @@ app.get('/api/health', (_, res) => res.json({
   version: '2.3.0',
   emailConfigured: !!(config.brevo.apiKey && config.brevo.apiKey !== 'your_brevo_api_key_here'),
   geminiConfigured: !!(config.gemini && config.gemini.apiKey),
+  geminiModel: config.gemini ? config.gemini.model : 'not set',
   frontendUrl: config.frontendUrl,
 }));
+
+app.get('/api/test-gemini', async (_, res) => {
+  try {
+    const axios = require('axios');
+    const apiKey = config.gemini.apiKey;
+    const model = config.gemini.model;
+    if (!apiKey) return res.json({ ok: false, error: 'GEMINI_API_KEY not set' });
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const response = await axios.post(url, {
+      contents: [{ parts: [{ text: 'Say hello in 5 words' }] }],
+      generationConfig: { maxOutputTokens: 50 },
+    }, { headers: { 'Content-Type': 'application/json' }, timeout: 15000 });
+    const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    res.json({ ok: true, model, text });
+  } catch (err) {
+    const errMsg = err.response ? JSON.stringify(err.response.data) : err.message;
+    res.json({ ok: false, error: errMsg });
+  }
+});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/student', studentRoutes);
