@@ -52,6 +52,8 @@ model submissions {
   code               String
   language           String
   ai_score           Int?
+  points_earned      Int      @default(0)
+  time_taken_secs    Int?
   logical_correctness Int?
   syntax_review      String?
   suggestions        String?

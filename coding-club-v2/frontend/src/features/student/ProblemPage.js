@@ -26,6 +26,7 @@ export default function ProblemPage() {
   const [review, setReview] = useState(null);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [existingSubmission, setExistingSubmission] = useState(null);
+  const [pointsEarned, setPointsEarned] = useState(null);
 
   const [activeTab, setActiveTab] = useState('console'); // 'console' | 'errors' | 'review'
 
@@ -90,8 +91,14 @@ export default function ProblemPage() {
             setReview(data.existingSubmission.ai_feedback);
             setActiveTab('review');
           }
+          if (data.existingSubmission.points_earned != null) {
+            setPointsEarned(data.existingSubmission.points_earned);
+          }
         } else {
           setCode(data.starter_code || starters.javascript);
+          if (!localStorage.getItem(`problem_started_${id}`)) {
+            localStorage.setItem(`problem_started_${id}`, new Date().toISOString());
+          }
         }
       })
       .catch(() => toast.error('Failed to load problem'))
@@ -128,17 +135,21 @@ export default function ProblemPage() {
 
     setSubmitting(true);
     try {
-      const r = await api.post('/student/submit', { problem_id: Number(id), code, language: lang });
+      const startedAt = localStorage.getItem(`problem_started_${id}`) || new Date().toISOString();
+      const r = await api.post('/student/submit', { problem_id: Number(id), code, language: lang, started_at: startedAt });
       const submittedReview = r.data.data.review;
+      const earned = r.data.data.pointsEarned;
       setReview(submittedReview);
+      setPointsEarned(earned);
       setHasSubmitted(true);
       setExistingSubmission(r.data.data.submission);
       setActiveTab('review');
+      localStorage.removeItem(`problem_started_${id}`);
 
       if (submittedReview?.has_syntax_error) {
         toast.error('Syntax error detected! Check review panel.');
       } else {
-        toast.success(`Score: ${submittedReview.ai_score}% stored in database!`);
+        toast.success(`+${earned} points earned!`);
       }
     } catch (e) {
       toast.error(e.response?.data?.message || 'Submission failed');
@@ -152,6 +163,7 @@ export default function ProblemPage() {
 
   const sc = review?.ai_score ?? existingSubmission?.ai_score ?? 0;
   const scClass = sc >= 80 ? 'score-high' : sc >= 60 ? 'score-mid' : sc >= 40 ? 'score-low' : 'score-bad';
+  const displayPoints = pointsEarned ?? existingSubmission?.points_earned ?? null;
 
   let ex = null;
   if (problem?.examples) {
@@ -195,7 +207,7 @@ export default function ProblemPage() {
         {/* Submit Button */}
         {hasSubmitted ? (
           <button className="btn btn-secondary" disabled title="You have already submitted this problem once">
-            ✓ Submitted ({sc}/100)
+            ✓ Submitted {displayPoints != null ? `(+${displayPoints} pts)` : `(${sc}/100)`}
           </button>
         ) : (
           <button className="btn btn-primary" onClick={submit} disabled={submitting || compiling}>
@@ -359,9 +371,12 @@ export default function ProblemPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
                       <div className={`score-circle ${scClass}`}>{sc}</div>
                       <div>
-                        <div style={{ fontWeight: 600 }}>Final Saved Score</div>
+                        <div style={{ fontWeight: 600 }}>
+                          {displayPoints != null ? `+${displayPoints} Points Earned` : 'Final Score'}
+                        </div>
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                           {sc >= 80 ? 'Excellent Solution' : sc >= 60 ? 'Good Effort' : 'Needs Improvement'}
+                          {displayPoints != null && ` • AI Score: ${sc}/100`}
                         </div>
                       </div>
                     </div>

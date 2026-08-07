@@ -2,6 +2,7 @@ const { body, param } = require('express-validator');
 const validate = require('../../../middleware/validate');
 const { authenticate, authorize } = require('../../../middleware/auth');
 const svc = require('../services/adminService');
+const prisma = require('../../../config/database');
 
 const router = require('express').Router();
 router.use(authenticate, authorize('admin'));
@@ -23,6 +24,23 @@ router.post('/test-email', [body('email').isEmail()], validate, async (req, res)
     } else {
       res.status(500).json({ success: false, message: 'Failed to send email. Check BREVO_API_KEY on Render.' });
     }
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.post('/migrate', async (req, res) => {
+  try {
+    const results = [];
+    const sqls = [
+      `ALTER TABLE submissions ADD COLUMN IF NOT EXISTS points_earned INTEGER DEFAULT 0`,
+      `ALTER TABLE submissions ADD COLUMN IF NOT EXISTS time_taken_secs INTEGER`,
+    ];
+    for (const sql of sqls) {
+      await prisma.$executeRawUnsafe(sql);
+      results.push(`OK: ${sql.substring(0, 60)}...`);
+    }
+    res.json({ success: true, results });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

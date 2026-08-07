@@ -2,7 +2,7 @@ const bcrypt = require('bcrypt');
 const prisma = require('../../../config/database');
 const ApiResponse = require('../../../shared/utils/response');
 const { NotFoundError, ConflictError, ValidationError, ForbiddenError } = require('../../../shared/errors');
-const { logActivity, calculateScore } = require('../../../shared/utils/helpers');
+const { logActivity, calculatePoints } = require('../../../shared/utils/helpers');
 const { checkAndAwardAchievements } = require('./achievementChecker');
 
 function cleanExampleInput(input) {
@@ -161,7 +161,7 @@ exports.compileCode = async (req, res, next) => {
 
 exports.submitCode = async (req, res, next) => {
   try {
-    const { problem_id, code, language } = req.body;
+    const { problem_id, code, language, started_at } = req.body;
     const problem = await prisma.problems.findUnique({ where: { id: Number(problem_id) } });
     if (!problem) throw new NotFoundError('Problem not found');
 
@@ -196,12 +196,15 @@ exports.submitCode = async (req, res, next) => {
     const compileResult = await nemotronService.compileCode(problem.description, code, language, exampleInput, exampleOutput);
     const review = compileResult.review;
 
-    const { calculateScore } = require('../../../shared/utils/helpers');
-    const points = calculateScore(problem.difficulty, review.ai_score);
+    const timeTakenSecs = started_at
+      ? Math.round((Date.now() - new Date(started_at).getTime()) / 1000)
+      : null;
+    const points = calculatePoints(problem.difficulty, review.ai_score, timeTakenSecs);
 
     const submission = await prisma.submissions.create({
       data: { student_id: req.user.id, problem_id: Number(problem_id), code, language,
-        ai_score: review.ai_score, logical_correctness: review.logical_correctness,
+        ai_score: review.ai_score, points_earned: points, time_taken_secs: timeTakenSecs,
+        logical_correctness: review.logical_correctness,
         syntax_review: review.syntax_review, suggestions: review.suggestions,
         time_complexity: review.time_complexity, space_complexity: review.space_complexity,
         mistakes: review.mistakes, ai_feedback: review },
@@ -219,12 +222,11 @@ exports.submitCode = async (req, res, next) => {
       create: { student_id: req.user.id, coding_score: s.coding_score, total_score: s.total_points },
     });
 
-    logActivity(req.user.id, 'student', 'submit_code', { problem_id, language, score: review.ai_score });
+    logActivity(req.user.id, 'student', 'submit_code', { problem_id, language, score: review.ai_score, points, timeTakenSecs });
 
-    // Auto-check and award achievements
     const newAchievements = await checkAndAwardAchievements(req.user.id);
 
-    ApiResponse.success(res, { submission, review, pointsEarned: points, newAchievements });
+    ApiResponse.success(res, { submission, review, pointsEarned: points, timeTakenSecs, newAchievements });
   } catch (err) { next(err); }
 };
 

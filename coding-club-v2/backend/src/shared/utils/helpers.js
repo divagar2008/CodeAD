@@ -10,9 +10,22 @@ async function logActivity(userId, userType, action, details = null) {
   }
 }
 
-function calculateScore(difficulty, aiScore) {
-  const multipliers = { easy: 1, medium: 2, hard: 3 };
-  return Math.round(aiScore * (multipliers[difficulty] || 1));
+const DIFFICULTY_BASE = { easy: 100, medium: 200, hard: 300 };
+
+function getTimeBonus(secs) {
+  if (secs == null || secs < 0) return 1.0;
+  if (secs < 300) return 1.5;
+  if (secs < 900) return 1.3;
+  if (secs < 1800) return 1.1;
+  if (secs < 3600) return 1.0;
+  return 0.9;
 }
 
-module.exports = { logActivity, calculateScore };
+function calculatePoints(difficulty, aiScore, timeTakenSecs) {
+  const base = DIFFICULTY_BASE[difficulty] || 100;
+  const quality = Math.min(100, Math.max(0, aiScore)) / 100;
+  const bonus = getTimeBonus(timeTakenSecs);
+  return Math.round(base * quality * bonus);
+}
+
+module.exports = { logActivity, calculatePoints, getTimeBonus, DIFFICULTY_BASE };
