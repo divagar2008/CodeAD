@@ -34,37 +34,33 @@ class GeminiService {
     }
   }
 
-  buildReviewPrompt(problemDesc, code, language, actualOutput = '', expectedOutput = '') {
-    const outputMatches = this.outputMatches(actualOutput, expectedOutput);
-
-    return `You are a strict code reviewer. Review this ${language} code. Return ONLY a JSON object.
+  buildReviewPrompt(problemDesc, code, language, actualOutput = '') {
+    return `You are a strict code reviewer. Review this ${language} code on its OWN merit. Return ONLY a JSON object.
 
 PROBLEM: ${problemDesc}
 
 CODE:
 ${code}
 
-${actualOutput ? `ACTUAL OUTPUT: ${actualOutput}` : ''}
-${expectedOutput ? `EXPECTED OUTPUT: ${expectedOutput}` : ''}
-OUTPUT MATCHES: ${outputMatches ? 'YES' : 'NO'}
+${actualOutput ? `PROGRAM OUTPUT: ${actualOutput}` : ''}
 
 INSTRUCTIONS:
-1. Check each line for syntax errors (missing brackets, colons, semicolons, indentation, undefined variables)
-2. Check each line for logic errors (wrong conditions, off-by-one, missing edge cases)
-3. Analyze the algorithm approach and complexity
-4. If OUTPUT MATCHES is NO, identify WHY the output is wrong and deduct points
-5. If OUTPUT MATCHES is YES but code has issues (wrong approach, missing edge cases), still deduct points
+1. Analyze each line of code for syntax errors (missing brackets, colons, semicolons, indentation, undefined variables)
+2. Analyze each line for logic errors (wrong conditions, off-by-one, missing edge cases)
+3. Evaluate the algorithm approach, correctness and complexity
+4. Judge the code purely against the problem statement above — NOT against any sample solution or sample output
+5. If the program has a clear bug or does not correctly solve the problem, deduct points
 
 SCORING RULES:
 - 90-100: Code is correct, handles edge cases, clean logic
-- 70-89: Works for given input but misses edge cases or uses inefficient approach
+- 70-89: Correct approach but misses edge cases or uses an inefficient solution
 - 50-69: Partially works, has logic gaps
 - 30-49: Major logic errors
 - 0-29: Completely broken
 
 IMPORTANT:
-- Do NOT give 100 if output does NOT match expected
-- Do NOT give high scores just because code "looks right" — verify the logic actually works
+- Do NOT give high scores just because code "looks right" — verify the logic actually solves the problem
+- Do NOT compare against a hidden expected output; score the code based on whether it solves the problem
 - Be strict. If there is ANY bug, deduct points.
 - Do NOT penalize for using input()/print() in Python or console.log in JavaScript. The platform feeds input automatically.
 
@@ -131,7 +127,7 @@ Return ONLY this JSON (no markdown, no explanation):
     };
   }
 
-  async reviewCode(problemDescription, code, language, actualOutput = '', expectedOutput = '') {
+  async reviewCode(problemDescription, code, language, actualOutput = '') {
     const cached = this.getCachedReview(code, language, problemDescription);
     if (cached) {
       console.log('Using cached AI review result');
@@ -146,7 +142,7 @@ Return ONLY this JSON (no markdown, no explanation):
           {
             contents: [{
               parts: [{
-                text: `You are a strict code reviewer. Review code and return ONLY valid JSON. Be strict — if output does not match expected, deduct points. Do not give 100 if there are bugs.\n\n${this.buildReviewPrompt(problemDescription, code, language, actualOutput, expectedOutput)}`
+                text: `You are a strict code reviewer. Review code and return ONLY valid JSON. Be strict — if the code has bugs, deduct points. Do not give 100 if the logic is flawed.\n\n${this.buildReviewPrompt(problemDescription, code, language, actualOutput)}`
               }]
             }],
             generationConfig: {
@@ -219,7 +215,7 @@ Return ONLY this JSON (no markdown, no explanation):
     return false;
   }
 
-  async compileCode(problemDescription, code, language, exampleInput = '', expectedOutput = '') {
+  async compileCode(problemDescription, code, language, exampleInput = '') {
     const { executeJS, executePython } = require('../shared/utils/codeExecutor');
     const startTime = Date.now();
 
@@ -243,17 +239,9 @@ Return ONLY this JSON (no markdown, no explanation):
       review = this.createSyntaxErrorReview(localExec.syntax_error_line, localExec.syntax_error_message);
     } else {
       const actualOutput = (localExec?.program_output || '').trim();
-      const expected = (expectedOutput || '').trim();
 
       console.log(`[Compile] Running AI review via Gemini...`);
-      review = await this.reviewCode(problemDescription, code, language, actualOutput, expected);
-
-      if (expected && actualOutput && this.outputMatches(actualOutput, expected)) {
-        console.log(`[Compile] Output matches expected.`);
-        review.output_matches_expected = true;
-      } else {
-        review.output_matches_expected = false;
-      }
+      review = await this.reviewCode(problemDescription, code, language, actualOutput);
     }
 
     const totalTime = Date.now() - startTime;
@@ -275,8 +263,7 @@ Return ONLY this JSON (no markdown, no explanation):
       errorLog = `[Compilation Error] Line ${syntaxLine}: ${syntaxMsg}\n${review.syntax_review || ''}`;
       outputLog = `Compilation Failed!\nFound syntax error on line ${syntaxLine}: ${syntaxMsg}`;
     } else {
-      const outputStatus = review.output_matches_expected ? '✓ Output matches expected' : '✗ Output does not match expected';
-      outputLog = `=================== PROGRAM STDOUT / OUTPUT ===================\n${programOutput}\n===============================================================\n\n[Compilation Details]\n- Language: ${language}\n- Output Status: ${outputStatus}\n- AI Score: ${review.ai_score}/100\n- Time Complexity: ${review.time_complexity}\n- Space Complexity: ${review.space_complexity}\n- Line Analysis: ${review.line_analysis || 'N/A'}\n- Status: ${review.output_matches_expected ? 'Output matches' : 'Code needs review'}`;
+      outputLog = `=================== PROGRAM STDOUT / OUTPUT ===================\n${programOutput}\n===============================================================\n\n[Compilation Details]\n- Language: ${language}\n- AI Score: ${review.ai_score}/100\n- Time Complexity: ${review.time_complexity}\n- Space Complexity: ${review.space_complexity}\n- Line Analysis: ${review.line_analysis || 'N/A'}\n- Status: ${review.ai_score >= 70 ? 'Code is in good shape' : review.ai_score >= 40 ? 'Code needs improvement' : 'Code needs major revision'}`;
       errorLog = 'No compilation errors. Code is ready for submission.';
     }
 
