@@ -227,7 +227,7 @@ Return ONLY this JSON (no markdown, no explanation):
 
     let localExec = null;
     if (language === 'javascript') {
-      localExec = executeJS(code, exampleInput);
+      localExec = await executeJS(code, exampleInput);
     } else if (language === 'python') {
       localExec = await executePython(code, exampleInput);
     }
