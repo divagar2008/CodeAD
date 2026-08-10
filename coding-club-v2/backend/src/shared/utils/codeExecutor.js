@@ -36,10 +36,12 @@ function executeJS(code, exampleInput = '') {
       cleanup();
 
       if (code !== 0 || stderr.trim()) {
+        const isSyntax = /SyntaxError/.test(stderr);
         const lineMatch = stderr.match(/\.js:(\d+)/);
         return resolve({
           executed: true,
-          has_syntax_error: true,
+          has_syntax_error: isSyntax,
+          has_runtime_error: !isSyntax,
           syntax_error_line: lineMatch ? Number(lineMatch[1]) : 1,
           syntax_error_message: stderr.trim() || 'JavaScript execution error',
           program_output: stdout.trim(),
@@ -50,6 +52,7 @@ function executeJS(code, exampleInput = '') {
       resolve({
         executed: true,
         has_syntax_error: false,
+        has_runtime_error: false,
         program_output: stdout.trim() || 'Program executed cleanly (No console.log output)',
         error_message: null,
       });
@@ -100,10 +103,12 @@ function executePython(code, exampleInput = '') {
           cleanup();
 
           if (code !== 0 || stderr.trim()) {
+            const isSyntax = /SyntaxError|IndentationError|TabError/.test(stderr);
             const lineMatch = stderr.match(/File ".*", line (\d+)/);
             return resolve({
               executed: true,
-              has_syntax_error: true,
+              has_syntax_error: isSyntax,
+              has_runtime_error: !isSyntax,
               syntax_error_line: lineMatch ? Number(lineMatch[1]) : 1,
               syntax_error_message: stderr.trim() || 'Python execution error',
               program_output: stdout.trim(),
@@ -114,6 +119,7 @@ function executePython(code, exampleInput = '') {
           resolve({
             executed: true,
             has_syntax_error: false,
+            has_runtime_error: false,
             program_output: stdout.trim() || 'Program executed cleanly (No print output)',
             error_message: null,
           });

@@ -115,6 +115,9 @@ export default function ProblemPage() {
       if (res.has_syntax_error) {
         toast.error(`Compilation error on Line ${res.syntax_error_line || 1}`);
         setActiveTab('errors');
+      } else if (res.has_runtime_error) {
+        toast.error('Code ran but crashed at runtime. Check the error logs.');
+        setActiveTab('errors');
       } else {
         toast.success('Compiled successfully! Check output logs.');
         setActiveTab('console');
@@ -150,8 +153,7 @@ export default function ProblemPage() {
         toast.error('Syntax error detected! Check review panel.');
       } else {
         toast.success(`+${earned} points earned!`);
-      }
-    } catch (e) {
+      }    } catch (e) {
       toast.error(e.response?.data?.message || 'Submission failed');
     } finally {
       setSubmitting(false);
@@ -354,6 +356,19 @@ export default function ProblemPage() {
                           <div>
                             <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>Syntax Error — Line {compileResult.syntax_error_line || 1}</div>
                             <div style={{ fontSize: '0.85rem', marginTop: 4, opacity: 0.9 }}>{compileResult.syntax_error_message}</div>
+                          </div>
+                        </div>
+                        <pre className="error-pre">{compileResult.error_log}</pre>
+                      </div>
+                    ) : compileResult?.has_runtime_error ? (
+                      <div>
+                        <div className="syntax-error-banner">
+                          <div className="syntax-error-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>Runtime Error — program crashed during execution</div>
+                            <div style={{ fontSize: '0.85rem', marginTop: 4, opacity: 0.9 }}>Your code compiled but crashed while running. Fix the error below, then compile again.</div>
                           </div>
                         </div>
                         <pre className="error-pre">{compileResult.error_log}</pre>

@@ -232,13 +232,17 @@ Return ONLY this JSON (no markdown, no explanation):
     console.log(`[Compile] Local execution completed in ${localTime}ms`);
 
     const localSyntaxError = localExec && localExec.executed && localExec.has_syntax_error;
+    const localRuntimeError = localExec && localExec.executed && localExec.has_runtime_error;
 
     let review;
     if (localSyntaxError) {
       console.log(`[Compile] Syntax error detected locally, skipping AI review`);
       review = this.createSyntaxErrorReview(localExec.syntax_error_line, localExec.syntax_error_message);
     } else {
-      const actualOutput = (localExec?.program_output || '').trim();
+      // For runtime errors, include the error trace in the output so the AI can diagnose it
+      const actualOutput = localRuntimeError
+        ? ((localExec?.program_output || '') + '\n[RUNTIME ERROR]\n' + (localExec?.error_message || '')).trim()
+        : (localExec?.program_output || '').trim();
 
       console.log(`[Compile] Running AI review via Gemini...`);
       review = await this.reviewCode(problemDescription, code, language, actualOutput);
@@ -263,13 +267,17 @@ Return ONLY this JSON (no markdown, no explanation):
       errorLog = `[Compilation Error] Line ${syntaxLine}: ${syntaxMsg}\n${review.syntax_review || ''}`;
       outputLog = `Compilation Failed!\nFound syntax error on line ${syntaxLine}: ${syntaxMsg}`;
     } else {
-      outputLog = `=================== PROGRAM STDOUT / OUTPUT ===================\n${programOutput}\n===============================================================\n\n[Compilation Details]\n- Language: ${language}\n- AI Score: ${review.ai_score}/100\n- Time Complexity: ${review.time_complexity}\n- Space Complexity: ${review.space_complexity}\n- Line Analysis: ${review.line_analysis || 'N/A'}\n- Status: ${review.ai_score >= 70 ? 'Code is in good shape' : review.ai_score >= 40 ? 'Code needs improvement' : 'Code needs major revision'}`;
-      errorLog = 'No compilation errors. Code is ready for submission.';
+      const errorNotice = localRuntimeError
+        ? `\n[RUNTIME ERROR]\n${localExec.error_message || ''}\n`
+        : '';
+      outputLog = `=================== PROGRAM STDOUT / OUTPUT ===================\n${programOutput}${errorNotice}\n===============================================================\n\n[Compilation Details]\n- Language: ${language}\n- AI Score: ${review.ai_score}/100\n- Time Complexity: ${review.time_complexity}\n- Space Complexity: ${review.space_complexity}\n- Line Analysis: ${review.line_analysis || 'N/A'}\n- Status: ${review.ai_score >= 70 ? 'Code is in good shape' : review.ai_score >= 40 ? 'Code needs improvement' : 'Code needs major revision'}`;
+      errorLog = localRuntimeError ? `Runtime error detected:\n${localExec.error_message || ''}` : 'No compilation errors. Code is ready for submission.';
     }
 
     return {
       success: !hasSyntaxError,
       has_syntax_error: hasSyntaxError,
+      has_runtime_error: !!localRuntimeError,
       syntax_error_line: syntaxLine,
       syntax_error_message: syntaxMsg,
       program_output: programOutput,

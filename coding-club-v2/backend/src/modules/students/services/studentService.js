@@ -20,6 +20,9 @@ function cleanExampleInput(input) {
   if (/^[a-zA-Z_]\w*\s*=\s*.+/.test(input)) {
     return input.replace(/^[a-zA-Z_]\w*\s*=\s*/, '').trim();
   }
+  // Handle natural-language prompt: "Enter a number : 34" → "34"
+  const promptMatch = input.match(/:\s*(.+)$/);
+  if (promptMatch) return promptMatch[1].trim();
   return input;
 }
 
