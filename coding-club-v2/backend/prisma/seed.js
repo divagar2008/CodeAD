@@ -10,8 +10,8 @@ async function main() {
   // All 60 students — AI&DS, 2nd Year
   const students = [
     { name: 'Ahmed Athief Khan M V', email: 'athief@college.edu', role: 'student' },
-    { name: 'Divagar M K', email: 'divagar@college.edu', role: 'admin' },
-    { name: 'Dharshan Bala P', email: 'dharshan@college.edu', role: 'admin' },
+    { name: 'Divagar M K', email: 'divagarmk1001@gmail.com', role: 'admin' },
+    { name: 'Dharshan Bala P', email: 'dharshanbala007007@gmail.com', role: 'admin' },
     { name: 'Jeyavarshan B', email: 'jeyavarshan@college.edu', role: 'student' },
     { name: 'Deepan M', email: 'deepan@college.edu', role: 'student' },
     { name: 'Vetriselvam R', email: 'vetriselvam@college.edu', role: 'student' },
