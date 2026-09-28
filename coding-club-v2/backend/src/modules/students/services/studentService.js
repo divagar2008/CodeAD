@@ -158,7 +158,7 @@ exports.compileCode = async (req, res, next) => {
     }
 
     exampleInput = cleanExampleInput(exampleInput);
-    exampleOutput = cleanExampleInput(exampleOutput);
+    exampleOutput = (exampleOutput || '').trim();
 
     const nemotronService = require('../../../ai/nemotronService');
     const result = await nemotronService.compileCode(problem.description, code, language, exampleInput, exampleOutput);
@@ -199,7 +199,7 @@ exports.submitCode = async (req, res, next) => {
       }
     }
     exampleInput = cleanExampleInput(exampleInput);
-    exampleOutput = cleanExampleInput(exampleOutput);
+    exampleOutput = (exampleOutput || '').trim();
 
     const compileResult = await nemotronService.compileCode(problem.description, code, language, exampleInput, exampleOutput);
     const review = compileResult.review;
@@ -241,6 +241,7 @@ exports.submitCode = async (req, res, next) => {
 exports.getLeaderboard = async (req, res, next) => {
   try {
     const entries = await prisma.leaderboard.findMany({
+      where: { total_score: { gt: 0 } },
       include: { student: { select: { id: true, name: true, email: true, department: true } } },
       orderBy: [{ total_score: 'desc' }, { coding_score: 'desc' }, { student_id: 'asc' }],
     });
@@ -303,9 +304,9 @@ exports.getProfile = async (req, res, next) => {
     const bestScore = submissions.length > 0 ? Math.max(...submissions.map(s => s.ai_score || 0)) : 0;
     const totalLivePoints = livePointsData._sum.points || 0;
 
-    // Leaderboard rank
+    // Leaderboard rank (only ranked with actual points)
     let rank = null;
-    if (leaderboardEntry) {
+    if (leaderboardEntry && leaderboardEntry.total_score > 0) {
       const higher = await prisma.leaderboard.count({ where: { total_score: { gt: leaderboardEntry.total_score } } });
       rank = higher + 1;
     }

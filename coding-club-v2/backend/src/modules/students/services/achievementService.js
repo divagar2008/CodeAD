@@ -87,6 +87,7 @@ async function getScoreHistory(studentId) {
 
 async function getTopStudents(excludeId, limit = 10) {
   const entries = await prisma.leaderboard.findMany({
+    where: { total_score: { gt: 0 } },
     include: { student: { select: { id: true, name: true, department: true } } },
     orderBy: { total_score: 'desc' }, take: limit + 5,
   });
@@ -97,7 +98,7 @@ async function getTopStudents(excludeId, limit = 10) {
 }
 
 async function getMentorStatus(studentId) {
-  const entries = await prisma.leaderboard.findMany({ orderBy: { total_score: 'desc' }, take: 5 });
+  const entries = await prisma.leaderboard.findMany({ where: { total_score: { gt: 0 } }, orderBy: { total_score: 'desc' }, take: 5 });
   const rank = entries.findIndex(e => e.student_id === studentId);
   return { isMentor: rank !== -1, mentorRank: rank !== -1 ? rank + 1 : null, mentorTier: rank === 0 ? 'The Champion' : rank === 1 ? 'The Conqueror' : rank === 2 ? 'The Victor' : 'Mentor' };
 }

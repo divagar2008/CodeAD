@@ -11,12 +11,12 @@ class GeminiService {
     this.cacheTTL = 5 * 60 * 1000;
   }
 
-  getCacheKey(code, language, problemDescription) {
-    return crypto.createHash('md5').update(`${language}:${problemDescription}:${code}`).digest('hex');
+  getCacheKey(code, language, problemDescription, expectedOutput = '') {
+    return crypto.createHash('md5').update(`${language}:${problemDescription}:${code}:${expectedOutput}`).digest('hex');
   }
 
-  getCachedReview(code, language, problemDescription) {
-    const key = this.getCacheKey(code, language, problemDescription);
+  getCachedReview(code, language, problemDescription, expectedOutput = '') {
+    const key = this.getCacheKey(code, language, problemDescription, expectedOutput);
     const cached = this.cache.get(key);
     if (cached && Date.now() - cached.timestamp < this.cacheTTL) {
       return cached.data;
@@ -25,8 +25,8 @@ class GeminiService {
     return null;
   }
 
-  setCachedReview(code, language, problemDescription, data) {
-    const key = this.getCacheKey(code, language, problemDescription);
+  setCachedReview(code, language, problemDescription, data, expectedOutput = '') {
+    const key = this.getCacheKey(code, language, problemDescription, expectedOutput);
     this.cache.set(key, { data, timestamp: Date.now() });
     if (this.cache.size > 100) {
       const firstKey = this.cache.keys().next().value;
@@ -34,7 +34,7 @@ class GeminiService {
     }
   }
 
-  buildReviewPrompt(problemDesc, code, language, actualOutput = '') {
+  buildReviewPrompt(problemDesc, code, language, actualOutput = '', expectedOutput = '', outputMatches = false) {
     return `You are a strict code reviewer. Review this ${language} code on its OWN merit. Return ONLY a JSON object.
 
 PROBLEM: ${problemDesc}
@@ -43,24 +43,27 @@ CODE:
 ${code}
 
 ${actualOutput ? `PROGRAM OUTPUT: ${actualOutput}` : ''}
+${expectedOutput ? `EXPECTED OUTPUT: ${expectedOutput}` : ''}
+${outputMatches !== null ? `OUTPUT MATCH: ${outputMatches ? 'YES — program output matches expected output' : 'NO — program output does NOT match expected output'}` : ''}
 
 INSTRUCTIONS:
 1. Analyze each line of code for syntax errors (missing brackets, colons, semicolons, indentation, undefined variables)
 2. Analyze each line for logic errors (wrong conditions, off-by-one, missing edge cases)
 3. Evaluate the algorithm approach, correctness and complexity
-4. Judge the code purely against the problem statement above — NOT against any sample solution or sample output
-5. If the program has a clear bug or does not correctly solve the problem, deduct points
+4. Compare the PROGRAM OUTPUT against the EXPECTED OUTPUT — if they do not match, the code is producing wrong results
+5. If the program output does not match expected output, the logical_correctness MUST be low (the logic is wrong)
+6. If the program has a clear bug or does not correctly solve the problem, deduct points
 
 SCORING RULES:
-- 90-100: Code is correct, handles edge cases, clean logic
+- 90-100: Code is correct, handles edge cases, clean logic, output matches expected
 - 70-89: Correct approach but misses edge cases or uses an inefficient solution
 - 50-69: Partially works, has logic gaps
 - 30-49: Major logic errors
-- 0-29: Completely broken
+- 0-29: Completely broken OR output does not match expected output
 
 IMPORTANT:
 - Do NOT give high scores just because code "looks right" — verify the logic actually solves the problem
-- Do NOT compare against a hidden expected output; score the code based on whether it solves the problem
+- If OUTPUT MATCH is NO, the code is WRONG regardless of how it looks. Deduct heavily.
 - Be strict. If there is ANY bug, deduct points.
 - Do NOT penalize for using input()/print() in Python or console.log in JavaScript. The platform feeds input automatically.
 
@@ -127,8 +130,8 @@ Return ONLY this JSON (no markdown, no explanation):
     };
   }
 
-  async reviewCode(problemDescription, code, language, actualOutput = '') {
-    const cached = this.getCachedReview(code, language, problemDescription);
+  async reviewCode(problemDescription, code, language, actualOutput = '', expectedOutput = '', outputMatches = null) {
+    const cached = this.getCachedReview(code, language, problemDescription, expectedOutput);
     if (cached) {
       console.log('Using cached AI review result');
       return cached;
@@ -142,7 +145,7 @@ Return ONLY this JSON (no markdown, no explanation):
           {
             contents: [{
               parts: [{
-                text: `You are a strict code reviewer. Review code and return ONLY valid JSON. Be strict — if the code has bugs, deduct points. Do not give 100 if the logic is flawed.\n\n${this.buildReviewPrompt(problemDescription, code, language, actualOutput)}`
+                text: `You are a strict code reviewer. Review code and return ONLY valid JSON. Be strict — if the code has bugs, deduct points. Do not give 100 if the logic is flawed.\n\n${this.buildReviewPrompt(problemDescription, code, language, actualOutput, expectedOutput, outputMatches)}`
               }]
             }],
             generationConfig: {
@@ -168,7 +171,7 @@ Return ONLY this JSON (no markdown, no explanation):
         }
 
         const result = this.parseResponse(text);
-        this.setCachedReview(code, language, problemDescription, result);
+        this.setCachedReview(code, language, problemDescription, result, expectedOutput);
         return result;
       } catch (err) {
         console.error(`Gemini API error (attempt ${attempt}/${maxRetries}):`, err.message);
@@ -215,7 +218,7 @@ Return ONLY this JSON (no markdown, no explanation):
     return false;
   }
 
-  async compileCode(problemDescription, code, language, exampleInput = '') {
+  async compileCode(problemDescription, code, language, exampleInput = '', exampleOutput = '') {
     const { executeJS, executePython } = require('../shared/utils/codeExecutor');
     const startTime = Date.now();
 
@@ -233,6 +236,13 @@ Return ONLY this JSON (no markdown, no explanation):
 
     const localSyntaxError = localExec && localExec.executed && localExec.has_syntax_error;
     const localRuntimeError = localExec && localExec.executed && localExec.has_runtime_error;
+    const actualOutput = (localExec?.program_output || '').trim();
+
+    let outputMatchesResult = null;
+    if (!localSyntaxError && !localRuntimeError && exampleOutput && actualOutput) {
+      outputMatchesResult = this.outputMatches(actualOutput, exampleOutput);
+      console.log(`[Compile] Output match: ${outputMatchesResult} (actual: "${actualOutput.substring(0, 100)}" vs expected: "${exampleOutput.substring(0, 100)}")`);
+    }
 
     let review;
     if (localSyntaxError) {
@@ -240,12 +250,20 @@ Return ONLY this JSON (no markdown, no explanation):
       review = this.createSyntaxErrorReview(localExec.syntax_error_line, localExec.syntax_error_message);
     } else {
       // For runtime errors, include the error trace in the output so the AI can diagnose it
-      const actualOutput = localRuntimeError
-        ? ((localExec?.program_output || '') + '\n[RUNTIME ERROR]\n' + (localExec?.error_message || '')).trim()
-        : (localExec?.program_output || '').trim();
+      const reviewOutput = localRuntimeError
+        ? (actualOutput + '\n[RUNTIME ERROR]\n' + (localExec?.error_message || '')).trim()
+        : actualOutput;
 
       console.log(`[Compile] Running AI review via Gemini...`);
-      review = await this.reviewCode(problemDescription, code, language, actualOutput);
+      review = await this.reviewCode(problemDescription, code, language, reviewOutput, exampleOutput, outputMatchesResult);
+    }
+
+    if (!localSyntaxError && outputMatchesResult === false) {
+      const originalScore = review.ai_score;
+      review.ai_score = Math.min(40, review.ai_score);
+      review.logical_correctness = review.ai_score;
+      console.log(`[Compile] Output mismatch — score capped from ${originalScore} to ${review.ai_score}`);
+      review.mistakes = (review.mistakes ? review.mistakes + '; ' : '') + `Output does NOT match expected output. Got: "${actualOutput.substring(0, 200)}", Expected: "${exampleOutput.substring(0, 200)}"`;
     }
 
     const totalTime = Date.now() - startTime;
@@ -278,6 +296,7 @@ Return ONLY this JSON (no markdown, no explanation):
       success: !hasSyntaxError,
       has_syntax_error: hasSyntaxError,
       has_runtime_error: !!localRuntimeError,
+      output_matches: outputMatchesResult,
       syntax_error_line: syntaxLine,
       syntax_error_message: syntaxMsg,
       program_output: programOutput,

@@ -45,9 +45,9 @@ async function checkAndAwardAchievements(studentId) {
   const streakResult = await getStreak(studentId);
   const streak = streakResult.current;
   
-  // Leaderboard rank
+  // Leaderboard rank (only rank when the student has actual points)
   let rank = null;
-  if (leaderboardEntry) {
+  if (leaderboardEntry && leaderboardEntry.total_score > 0) {
     const higher = await prisma.leaderboard.count({ where: { total_score: { gt: leaderboardEntry.total_score } } });
     rank = higher + 1;
   }

@@ -54,7 +54,17 @@ exports.update = async (req, res, next) => {
   try {
     const problem = await prisma.problems.findUnique({ where: { id: Number(req.params.id) } });
     if (!problem) throw new NotFoundError('Problem not found');
-    const updated = await prisma.problems.update({ where: { id: Number(req.params.id) }, data: req.body });
+    const allowedFields = {};
+    const { title, description, difficulty, input_description, output_description, constraints, examples, is_active } = req.body;
+    if (title !== undefined) allowedFields.title = title;
+    if (description !== undefined) allowedFields.description = description;
+    if (difficulty !== undefined) allowedFields.difficulty = difficulty;
+    if (input_description !== undefined) allowedFields.input_description = input_description;
+    if (output_description !== undefined) allowedFields.output_description = output_description;
+    if (constraints !== undefined) allowedFields.constraints = constraints;
+    if (examples !== undefined) allowedFields.examples = examples;
+    if (is_active !== undefined) allowedFields.is_active = is_active;
+    const updated = await prisma.problems.update({ where: { id: Number(req.params.id) }, data: allowedFields });
     ApiResponse.success(res, updated, 'Updated');
   } catch (err) { next(err); }
 };

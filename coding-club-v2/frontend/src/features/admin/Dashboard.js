@@ -170,9 +170,9 @@ export default function Dashboard() {
                   <tr><th>Rank</th><th>Name</th><th>Score</th></tr>
                 </thead>
                 <tbody>
-                  {(!a.topPerformers || a.topPerformers.length === 0) ? (
-                    <tr><td colSpan={3} className="empty">No data</td></tr>
-                  ) : a.topPerformers.slice(0, 5).map((e) => {
+                  {(a.topPerformers || []).filter(e => (e.score || 0) > 0).slice(0, 5).length === 0 ? (
+                    <tr><td colSpan={3} className="empty">No scores yet — rankings appear once students earn points</td></tr>
+                  ) : (a.topPerformers || []).filter(e => (e.score || 0) > 0).slice(0, 5).map((e) => {
                     const medalStyles = {
                       1: { bg: 'linear-gradient(135deg, #fbbf24, #f59e0b)', shadow: '0 2px 12px rgba(251,191,36,0.4)' },
                       2: { bg: 'linear-gradient(135deg, #d1d5db, #9ca3af)', shadow: '0 2px 10px rgba(156,163,175,0.4)' },

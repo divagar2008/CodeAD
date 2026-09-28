@@ -7,21 +7,21 @@ async function main() {
 
   const studentPass = await bcrypt.hash('student123', 12);
 
-  // All 60 students — AI&DS, 2nd Year
+  // All 56 students — AI&DS, 2nd Year (exact match to production DB)
   const students = [
     { name: 'Ahmed Athief Khan M V', email: 'athief@college.edu', role: 'student' },
-    { name: 'Divagar M K', email: 'divagarmk1001@gmail.com', role: 'admin' },
+    { name: 'Divagar M K', email: 'mkdivagar7@gmail.com', role: 'admin' },
     { name: 'Dharshan Bala P', email: 'dharshanbala007007@gmail.com', role: 'admin' },
     { name: 'Jeyavarshan B', email: 'jeyavarshan@college.edu', role: 'student' },
     { name: 'Deepan M', email: 'deepan@college.edu', role: 'student' },
     { name: 'Vetriselvam R', email: 'vetriselvam@college.edu', role: 'student' },
-    { name: 'Heman M', email: 'heman@college.edu', role: 'student' },
+    { name: 'Heman M', email: 'hemansakthivel2914@gmail.com', role: 'student' },
     { name: 'Gopal Karthick S', email: 'gopalkarthick@college.edu', role: 'student' },
-    { name: 'Kanishkumar K', email: 'kanish@college.edu', role: 'student' },
+    { name: 'Kanish Kumar K', email: 'kanish@college.edu', role: 'student' },
     { name: 'Devadharshan V', email: 'devadharshan@college.edu', role: 'student' },
     { name: 'Sankara Narayanan R', email: 'sankara@college.edu', role: 'student' },
     { name: 'Srinivash T', email: 'srinivash@college.edu', role: 'student' },
-    { name: 'Sriram V', email: 'sriram@college.edu', role: 'student' },
+    { name: 'Sriram V', email: 'v.sriram.7094396747@gmail.com', role: 'student' },
     { name: 'Rajarajeswari S', email: 'raji@college.edu', role: 'student' },
     { name: 'Rajasri M', email: 'rajasri@college.edu', role: 'student' },
     { name: 'Praveena M', email: 'praveena@college.edu', role: 'student' },
@@ -67,57 +67,47 @@ async function main() {
     { name: 'Poorvaja S', email: 'poorvaja@college.edu', role: 'student' },
   ];
 
-  let created = 0;
-  let skipped = 0;
-
-  for (const s of students) {
-    const existing = await prisma.students.findUnique({ where: { email: s.email } });
-    if (existing) {
-      if (s.role === 'admin') {
-        const valid = await bcrypt.compare('student123', existing.password);
-        if (!valid) {
-          await prisma.students.update({ where: { email: s.email }, data: { password: studentPass, role: s.role } });
-          console.log(`Updated admin password: ${s.email}`);
+  // Students only seeded on an EMPTY table — production DB is the source of truth.
+  // This prevents re-creating students that admins deleted/renamed in the portal.
+  const existingStudents = await prisma.students.count();
+  if (existingStudents === 0) {
+    for (const s of students) {
+      const student = await prisma.students.create({
+        data: {
+          name: s.name,
+          email: s.email,
+          password: studentPass,
+          department: 'AI&DS',
+          year: '2nd',
+          role: s.role,
         }
-      }
-      skipped++;
-      continue;
+      });
+
+      await prisma.leaderboard.create({
+        data: { student_id: student.id, coding_score: 0, live_session_pts: 0, total_score: 0 }
+      });
+
+      await prisma.user_profiles.create({
+        data: { student_id: student.id }
+      });
     }
-
-    const student = await prisma.students.create({
-      data: {
-        name: s.name,
-        email: s.email,
-        password: studentPass,
-        department: 'AI&DS',
-        year: '2nd',
-        role: s.role,
-      }
-    });
-
-    await prisma.leaderboard.create({
-      data: { student_id: student.id, coding_score: 0, live_session_pts: 0, total_score: 0 }
-    });
-
-    await prisma.user_profiles.create({
-      data: { student_id: student.id }
-    });
-
-    created++;
+    console.log(`Students: ${students.length} created (empty table)`);
+  } else {
+    console.log(`Students already exist (${existingStudents}), skipping — DB is authoritative`);
   }
-
-  console.log(`Students: ${created} created, ${skipped} already existed`);
 
   // Problems (only if none exist)
   const existingProblems = await prisma.problems.count();
   if (existingProblems === 0) {
     const problems = [
-      { title: 'Two Sum', description: 'Given an array of integers nums and an integer target, return indices of the two numbers that add up to target.', difficulty: 'easy', constraints: '2 <= nums.length <= 10^4', examples: { input: '2 7 11 15 9', output: '[0,1]' } },
+      { title: 'Two Sum', description: 'Given an array of integers nums and an integer target, return indices of the two numbers that add up to target.', difficulty: 'easy', constraints: '2 <= nums.length <= 10^4', examples: { input: 'nums = [2,7,11,15], target = 9', output: '[0,1]' } },
       { title: 'Reverse String', description: 'Write a function that reverses a string given as a character array.', difficulty: 'easy', examples: { input: 'hello', output: 'olleh' } },
       { title: 'Longest Substring', description: 'Find the length of the longest substring without repeating characters.', difficulty: 'medium', examples: { input: 'abcabcbb', output: '3' } },
-      { title: 'Merge Sorted Arrays', description: 'Merge two sorted arrays into one sorted array in-place.', difficulty: 'medium', examples: { input: '[1,2,3,0,0,0] [2,5,6]', output: '[1,2,2,3,5,6]' } },
+      { title: 'Merge Sorted Arrays', description: 'Merge two sorted arrays into one sorted array in-place.', difficulty: 'medium', examples: { input: '[1,2,3,0,0,0], [2,5,6]', output: '[1,2,2,3,5,6]' } },
       { title: 'Trapping Rain Water', description: 'Compute how much water can be trapped after raining given elevation map.', difficulty: 'hard', examples: { input: '[0,1,0,2,1,0,1,3,2,1,2,1]', output: '6' } },
       { title: 'Binary Tree Max Path', description: 'Find the maximum path sum in a non-empty binary tree.', difficulty: 'hard', examples: { input: '[1,2,3]', output: '6' } },
+      { title: 'Sum', description: 'Summing two given numbers', difficulty: 'easy', examples: { input: 'a=2 \nb=4', output: '6' } },
+      { title: 'Arithmetic Operation', description: 'Divide a number by 2', difficulty: 'easy', examples: { input: 'Enter a number : 34', output: '17' } },
     ];
 
     for (const p of problems) {

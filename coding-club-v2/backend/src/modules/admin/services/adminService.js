@@ -48,16 +48,20 @@ exports.updateStudent = async (req, res, next) => {
     const student = await prisma.students.findUnique({ where: { id: Number(id) } });
     if (!student) throw new NotFoundError('Student not found');
 
-    const updated = await prisma.students.update({ where: { id: Number(id) }, data: req.body });
+    const allowedFields = {};
+    const { name, email, department, year, is_active, password } = req.body;
+    if (name !== undefined) allowedFields.name = name;
+    if (email !== undefined) allowedFields.email = email;
+    if (department !== undefined) allowedFields.department = department;
+    if (year !== undefined) allowedFields.year = year;
+    if (is_active !== undefined) allowedFields.is_active = is_active;
+    if (password) allowedFields.password = await bcrypt.hash(password, 12);
 
-    if ('coding_score' in req.body || 'total_points' in req.body || 'problems_solved' in req.body) {
-      await prisma.leaderboard.upsert({
-        where: { student_id: Number(id) },
-        update: { coding_score: updated.coding_score, total_score: updated.total_points },
-        create: { student_id: Number(id), coding_score: updated.coding_score, total_score: updated.total_points },
-      });
-      await prisma.submissions.deleteMany({ where: { student_id: Number(id) } });
+    if (Object.keys(allowedFields).length === 0) {
+      return ApiResponse.success(res, { id: student.id, name: student.name, email: student.email }, 'No changes');
     }
+
+    const updated = await prisma.students.update({ where: { id: Number(id) }, data: allowedFields });
 
     logActivity(req.user.id, 'admin', 'update_student', { id: Number(id) });
     ApiResponse.success(res, { id: updated.id, name: updated.name, email: updated.email }, 'Updated');
@@ -87,6 +91,7 @@ exports.getReports = async (req, res, next) => {
       prisma.activity_logs.count({ where: { created_at: { gte: today } } }),
       prisma.activity_logs.count({ where: { created_at: { gte: weekAgo } } }),
       prisma.leaderboard.findMany({
+        where: { total_score: { gt: 0 } },
         include: { student: { select: { id: true, name: true, email: true, department: true } } },
         orderBy: { total_score: 'desc' }, take: 10,
       }),
@@ -167,6 +172,7 @@ exports.getAnalytics = async (req, res, next) => {
 
     // ── Top Performers ──
     const topPerformers = await prisma.leaderboard.findMany({
+      where: { total_score: { gt: 0 } },
       include: { student: { select: { id: true, name: true } } },
       orderBy: { total_score: 'desc' }, take: 10,
     });

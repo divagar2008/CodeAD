@@ -28,7 +28,13 @@ exports.update = async (req, res, next) => {
   try {
     const session = await prisma.live_sessions.findUnique({ where: { id: Number(req.params.id) } });
     if (!session) throw new NotFoundError('Session not found');
-    const updated = await prisma.live_sessions.update({ where: { id: Number(req.params.id) }, data: req.body });
+    const allowedFields = {};
+    const { name, date, description, is_published } = req.body;
+    if (name !== undefined) allowedFields.name = name;
+    if (date !== undefined) allowedFields.date = new Date(date);
+    if (description !== undefined) allowedFields.description = description;
+    if (is_published !== undefined) allowedFields.is_published = is_published;
+    const updated = await prisma.live_sessions.update({ where: { id: Number(req.params.id) }, data: allowedFields });
     ApiResponse.success(res, updated, 'Updated');
   } catch (err) { next(err); }
 };
@@ -45,6 +51,7 @@ exports.remove = async (req, res, next) => {
 exports.awardPoints = async (req, res, next) => {
   try {
     const { session_id, student_id, points } = req.body;
+    const numPoints = Number(points);
     const [session, student] = await Promise.all([
       prisma.live_sessions.findUnique({ where: { id: Number(session_id) } }),
       prisma.students.findUnique({ where: { id: Number(student_id) } }),
@@ -52,16 +59,23 @@ exports.awardPoints = async (req, res, next) => {
     if (!session) throw new NotFoundError('Session not found');
     if (!student) throw new NotFoundError('Student not found');
 
+    const existing = await prisma.live_points.findUnique({
+      where: { session_id_student_id: { session_id: Number(session_id), student_id: Number(student_id) } },
+    });
+    const delta = existing ? numPoints - existing.points : numPoints;
+
     await prisma.live_points.upsert({
       where: { session_id_student_id: { session_id: Number(session_id), student_id: Number(student_id) } },
-      update: { points: Number(points) },
-      create: { session_id: Number(session_id), student_id: Number(student_id), points: Number(points) },
+      update: { points: numPoints },
+      create: { session_id: Number(session_id), student_id: Number(student_id), points: numPoints },
     });
 
     const allPts = await prisma.live_points.findMany({ where: { student_id: Number(student_id) } });
     const totalLive = allPts.reduce((s, p) => s + p.points, 0);
 
-    await prisma.students.update({ where: { id: Number(student_id) }, data: { total_points: { increment: Number(points) } } });
+    if (delta !== 0) {
+      await prisma.students.update({ where: { id: Number(student_id) }, data: { total_points: { increment: delta } } });
+    }
     const s = await prisma.students.findUnique({ where: { id: Number(student_id) } });
 
     await prisma.leaderboard.upsert({
