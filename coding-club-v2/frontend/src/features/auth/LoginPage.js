@@ -127,12 +127,22 @@ export default function LoginPage() {
         title={isRegister ? 'Create Account' : 'Welcome Back'}
         description={isRegister ? 'Join the CodeAD community' : 'Sign in to your CodeAD account'}
         footerContent={
-          <p className="auth-footer-text">
-            {isRegister ? 'Already have an account?' : "Don't have an account?"}{' '}
-            <button type="button" onClick={toggleMode} className="auth-footer-link">
-              {isRegister ? 'Sign In' : 'Register'}
-            </button>
-          </p>
+          <>
+            <p className="auth-footer-text">
+              {isRegister ? 'Already have an account?' : "Don't have an account?"}{' '}
+              <button type="button" onClick={toggleMode} className="auth-footer-link">
+                {isRegister ? 'Sign In' : 'Register'}
+              </button>
+            </p>
+            {!isRegister && (
+              <p className="auth-footer-text">
+                Are you an administrator?{' '}
+                <button type="button" onClick={() => navigate('/admin/login')} className="auth-footer-link">
+                  Admin Sign In
+                </button>
+              </p>
+            )}
+          </>
         }
       >
         <form onSubmit={handleSubmit} autoComplete="off" className="auth-form">
