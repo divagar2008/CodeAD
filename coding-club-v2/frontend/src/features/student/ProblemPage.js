@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
@@ -11,6 +11,22 @@ import HamsterLoader from '../../components/ui/HamsterLoader';
 
 const exts = { javascript: [javascript()], python: [python()], java: [java()], cpp: [cpp()], c: [cpp()], other: [javascript()] };
 const starters = { javascript: '// Your solution\n', python: '# Your solution\n', java: '// Your solution\n', cpp: '// Your solution\n', c: '// Your solution\n', other: '// Your solution\n' };
+
+/* ─── Local draft storage ───
+   Keeps the student's unsent code, selected language and last run output
+   so nothing is lost when the page is refreshed or navigated away. */
+const draftKey = (pid, l) => `cc_draft_${pid}_${l}`;
+const outputKey = (pid, l) => `cc_output_${pid}_${l}`;
+const langKey = (pid) => `cc_lang_${pid}`;
+
+const readLS = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const writeLS = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* quota */ } };
+const removeLS = (k) => { try { localStorage.removeItem(k); } catch (e) {} };
+const readOutput = (k) => {
+  const raw = readLS(k);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (e) { removeLS(k); return null; }
+};
 
 export default function ProblemPage() {
   const { id } = useParams();
@@ -29,6 +45,16 @@ export default function ProblemPage() {
   const [pointsEarned, setPointsEarned] = useState(null);
 
   const [activeTab, setActiveTab] = useState('console'); // 'console' | 'errors' | 'review'
+
+  const consoleRef = useRef(null);
+
+  // Bring the output console into view whenever new results arrive,
+  // so output/errors are never hidden below the fold.
+  useEffect(() => {
+    if ((compileResult || review) && !compiling && !submitting && consoleRef.current) {
+      consoleRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [compileResult, review, compiling, submitting]);
 
   const [themeMode, setThemeMode] = useState(
     document.documentElement.getAttribute('data-theme') || 'dark'
@@ -84,26 +110,71 @@ export default function ProblemPage() {
         setHasSubmitted(data.hasSubmitted || false);
         setExistingSubmission(data.existingSubmission || null);
 
-        if (data.existingSubmission) {
-          setCode(data.existingSubmission.code || data.starter_code || starters.javascript);
-          if (data.existingSubmission.language) setLang(data.existingSubmission.language);
-          if (data.existingSubmission.ai_feedback) {
-            setReview(data.existingSubmission.ai_feedback);
-            setActiveTab('review');
-          }
-          if (data.existingSubmission.points_earned != null) {
-            setPointsEarned(data.existingSubmission.points_earned);
-          }
+        // Restore the language the student was last working in
+        const savedLang = readLS(langKey(id));
+        const submissionLang = data.existingSubmission?.language;
+        const initialLang = (savedLang && starters[savedLang])
+          ? savedLang
+          : (submissionLang && starters[submissionLang] ? submissionLang : 'javascript');
+        setLang(initialLang);
+
+        // Restore unsent draft → graded submission → starter code
+        const draft = readLS(draftKey(id, initialLang));
+        if (draft != null) {
+          setCode(draft);
+        } else if (data.existingSubmission?.code && data.existingSubmission.language === initialLang) {
+          setCode(data.existingSubmission.code);
         } else {
-          setCode(data.starter_code || starters.javascript);
-          if (!localStorage.getItem(`problem_started_${id}`)) {
-            localStorage.setItem(`problem_started_${id}`, new Date().toISOString());
-          }
+          setCode(data.starter_code || starters[initialLang] || starters.javascript);
+        }
+
+        if (data.existingSubmission?.ai_feedback) {
+          setReview(data.existingSubmission.ai_feedback);
+        }
+        if (data.existingSubmission?.points_earned != null) {
+          setPointsEarned(data.existingSubmission.points_earned);
+        }
+
+        // Restore the last run output so results survive a refresh
+        const savedOutput = readOutput(outputKey(id, initialLang));
+        if (savedOutput) {
+          setCompileResult(savedOutput);
+          setActiveTab('console');
+        } else if (data.existingSubmission?.ai_feedback) {
+          setActiveTab('review');
+        }
+
+        if (!readLS(`problem_started_${id}`)) {
+          writeLS(`problem_started_${id}`, new Date().toISOString());
         }
       })
       .catch(() => toast.error('Failed to load problem'))
       .finally(() => setLoading(false));
   }, [id]);
+
+  // Switching language keeps each language's own draft and last run output
+  const changeLang = (newLang) => {
+    setLang(newLang);
+    writeLS(langKey(id), newLang);
+
+    const draft = readLS(draftKey(id, newLang));
+    if (draft != null) {
+      setCode(draft);
+    } else if (existingSubmission?.code && existingSubmission.language === newLang) {
+      setCode(existingSubmission.code);
+    } else {
+      setCode(starters[newLang] || starters.other);
+    }
+
+    const savedOutput = readOutput(outputKey(id, newLang));
+    setCompileResult(savedOutput);
+    if (savedOutput) setActiveTab('console');
+  };
+
+  const handleCodeChange = (v) => {
+    setCode(v);
+    writeLS(draftKey(id, lang), v);
+  };
 
   const compile = async () => {
     if (!code.trim()) return toast.error('Write some code before compiling');
@@ -112,6 +183,8 @@ export default function ProblemPage() {
       const r = await api.post('/student/compile', { problem_id: Number(id), code, language: lang });
       const res = r.data.data;
       setCompileResult(res);
+      writeLS(outputKey(id, lang), JSON.stringify(res));
+      writeLS(draftKey(id, lang), code);
       if (res.has_syntax_error) {
         toast.error(`Compilation error on Line ${res.syntax_error_line || 1}`);
         setActiveTab('errors');
@@ -147,7 +220,8 @@ export default function ProblemPage() {
       setHasSubmitted(true);
       setExistingSubmission(r.data.data.submission);
       setActiveTab('review');
-      localStorage.removeItem(`problem_started_${id}`);
+      removeLS(`problem_started_${id}`);
+      writeLS(draftKey(id, lang), code);
 
       if (submittedReview?.has_syntax_error) {
         toast.error('Syntax error detected! Check review panel.');
@@ -190,19 +264,14 @@ export default function ProblemPage() {
         <select
           className="select"
           value={lang}
-          onChange={e => {
-            if (hasSubmitted) return;
-            setLang(e.target.value);
-            setCode(starters[e.target.value] || starters.other);
-          }}
-          disabled={hasSubmitted}
+          onChange={e => changeLang(e.target.value)}
           style={{ width: 130, flexShrink: 0 }}
         >
           {Object.keys(starters).filter(k => k !== 'other').map(k => <option key={k} value={k}>{k[0].toUpperCase() + k.slice(1)}</option>)}
         </select>
         
         {/* Compile / Run Button */}
-        <button className="btn btn-warning" onClick={compile} disabled={compiling || submitting || hasSubmitted}>
+        <button className="btn btn-warning" onClick={compile} disabled={compiling || submitting}>
           {compiling ? 'Compiling...' : '▶ Run / Compile'}
         </button>
 
@@ -223,7 +292,7 @@ export default function ProblemPage() {
           {hasSubmitted && (
             <div className="submitted-banner">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-              <span>Problem Completed! You have submitted your final answer.</span>
+              <span>Problem Completed! Your graded submission is final — you can keep editing, switching languages and running code to practice more.</span>
             </div>
           )}
 
@@ -261,11 +330,7 @@ export default function ProblemPage() {
               value={code}
               height="100%"
               extensions={exts[lang] || exts.javascript}
-              onChange={v => {
-                if (hasSubmitted) return;
-                setCode(v);
-              }}
-              readOnly={hasSubmitted}
+              onChange={handleCodeChange}
               theme={themeMode === 'dark' ? 'dark' : 'light'}
             />
           </div>
@@ -293,7 +358,7 @@ export default function ProblemPage() {
 
           {/* Console / Terminal & Review Tabbed Output */}
           {!compiling && !submitting && (compileResult || review || existingSubmission) && (
-            <div className="console-container">
+            <div className="console-container" ref={consoleRef}>
               <div className="console-tabs">
                 <button
                   className={`console-tab ${activeTab === 'console' ? 'active' : ''}`}

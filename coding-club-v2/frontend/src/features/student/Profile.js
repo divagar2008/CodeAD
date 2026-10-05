@@ -112,7 +112,7 @@ export default function Profile() {
                 {user?.department && <span className="profile-meta-chip">{user.department}</span>}
                 {user?.year && <span className="profile-meta-chip">{user.year}</span>}
                 {createdAt && <span className="profile-meta-chip">Joined {createdAt.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>}
-                {streak && streak.current > 0 && <span className="profile-meta-chip" style={{ color: '#f59e0b', borderColor: 'rgba(245,158,11,0.4)' }}>🔥 {streak.current} day streak</span>}
+                {streak && streak.current > 0 && <span className="profile-meta-chip" style={{ color: 'var(--accent-amber)', borderColor: 'rgba(245,158,11,0.4)' }}>🔥 {streak.current} day streak</span>}
               </div>
             </div>
           </div>
@@ -122,28 +122,28 @@ export default function Profile() {
         {/* ─── Stat Cards ─── */}
         <div className="grid g4" style={{ marginBottom: 24 }}>
           <div className="card stat profile-stat-card">
-            <div className="stat-icon" style={{ background: 'rgba(166,227,161,0.15)', color: '#a6e3a1' }}>
+            <div className="stat-icon" style={{ background: 'rgba(166,227,161,0.15)', color: 'var(--accent-green)' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
             </div>
             <div className="stat-value">{p.problems_solved || 0}</div>
             <div className="stat-label">Problems Solved</div>
           </div>
           <div className="card stat profile-stat-card">
-            <div className="stat-icon" style={{ background: 'rgba(137,180,250,0.15)', color: '#89b4fa' }}>
+            <div className="stat-icon" style={{ background: 'rgba(137,180,250,0.15)', color: 'var(--accent-blue)' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>
             </div>
             <div className="stat-value">{rank != null ? `#${rank}` : '—'}</div>
             <div className="stat-label">Leaderboard Rank</div>
           </div>
           <div className="card stat profile-stat-card">
-            <div className="stat-icon" style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}>
+            <div className="stat-icon" style={{ background: 'rgba(245,158,11,0.15)', color: 'var(--accent-amber)' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
             </div>
             <div className="stat-value">{p.total_points || 0}</div>
             <div className="stat-label">Total Points</div>
           </div>
           <div className="card stat profile-stat-card">
-            <div className="stat-icon" style={{ background: 'rgba(243,139,168,0.15)', color: '#f38ba8' }}>
+            <div className="stat-icon" style={{ background: 'rgba(243,139,168,0.15)', color: 'var(--accent-red)' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
             </div>
             <div className="stat-value">{totalLivePoints}</div>
@@ -265,8 +265,8 @@ export default function Profile() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {recentSubs.map(s => (
                     <div key={s.id} className="profile-activity-row">
-                      <span className="profile-activity-lang" style={{ color: LANG_COLORS[s.language] || '#888' }}>{s.language}</span>
-                      <span className="profile-activity-score" style={{ color: (s.ai_score || 0) >= 70 ? '#a6e3a1' : (s.ai_score || 0) >= 50 ? '#f9e2af' : '#f38ba8' }}>
+                      <span className="profile-activity-lang" style={{ color: 'var(--text-secondary)' }}>{s.language}</span>
+                      <span className="profile-activity-score" style={{ color: (s.ai_score || 0) >= 70 ? 'var(--accent-green)' : (s.ai_score || 0) >= 50 ? 'var(--accent-yellow)' : 'var(--accent-red)' }}>
                         {s.ai_score || 0}%
                       </span>
                       <span className="profile-activity-date">{new Date(s.created_at).toLocaleDateString()}</span>

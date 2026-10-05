@@ -24,11 +24,12 @@ export default function Dashboard() {
         )}
       </div>
       <div className="body">
-        <div className="grid g4" style={{ marginBottom: 24 }}>
+        <div className="grid g5" style={{ marginBottom: 24 }}>
           {[
             ['Problems Solved', s?.problems_solved || 0],
             ['Coding Score', s?.coding_score || 0],
             ['Total Points', s?.total_points || 0],
+            ['Live Points', data?.totalLivePoints || 0],
             ['Available', data?.totalProblems || 0],
           ].map(([label, val]) => (
             <div className="card stat" key={label}>

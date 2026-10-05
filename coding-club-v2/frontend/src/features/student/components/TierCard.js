@@ -24,7 +24,7 @@ export default function TierCard({ tier }) {
               {next.min - (current.min + Math.round(progress * (next.min - current.min) / 100))} pts to {next.name}
             </div>
           )}
-          {!next && <div style={{ fontSize: '0.8rem', color: '#a6e3a1' }}>Maximum tier reached! 🎉</div>}
+          {!next && <div style={{ fontSize: '0.8rem', color: 'var(--accent-green)' }}>Maximum tier reached! 🎉</div>}
         </div>
       </div>
       <div style={{ height: 8, background: 'var(--surface-hover)', borderRadius: 100, overflow: 'hidden' }}>

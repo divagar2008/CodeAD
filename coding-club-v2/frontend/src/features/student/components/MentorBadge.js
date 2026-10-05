@@ -4,10 +4,10 @@ export default function MentorBadge({ mentor }) {
   if (!mentor || !mentor.isMentor) return null;
 
   const tierStyles = {
-    'The Champion': { bg: 'linear-gradient(135deg, rgba(255,215,0,0.2), rgba(245,158,11,0.15))', border: 'rgba(255,215,0,0.5)', color: '#ffd700', icon: '🏆' },
-    'The Conqueror': { bg: 'linear-gradient(135deg, rgba(192,192,192,0.2), rgba(156,163,175,0.15))', border: 'rgba(192,192,192,0.5)', color: '#c0c0c0', icon: '⚔️' },
-    'The Victor': { bg: 'linear-gradient(135deg, rgba(205,127,50,0.2), rgba(180,83,9,0.1))', border: 'rgba(205,127,50,0.4)', color: '#cd7f32', icon: '🛡️' },
-    'Mentor': { bg: 'linear-gradient(135deg, rgba(59,130,246,0.15), rgba(37,99,235,0.1))', border: 'rgba(59,130,246,0.3)', color: '#60a5fa', icon: '💎' },
+    'The Champion': { bg: 'linear-gradient(135deg, rgba(255,215,0,0.2), rgba(245,158,11,0.15))', border: 'rgba(255,215,0,0.5)', color: 'var(--tier-gold)', icon: '🏆' },
+    'The Conqueror': { bg: 'linear-gradient(135deg, rgba(192,192,192,0.2), rgba(156,163,175,0.15))', border: 'rgba(192,192,192,0.5)', color: 'var(--tier-silver)', icon: '⚔️' },
+    'The Victor': { bg: 'linear-gradient(135deg, rgba(205,127,50,0.2), rgba(180,83,9,0.1))', border: 'rgba(205,127,50,0.4)', color: 'var(--tier-bronze)', icon: '🛡️' },
+    'Mentor': { bg: 'linear-gradient(135deg, rgba(59,130,246,0.15), rgba(37,99,235,0.1))', border: 'rgba(59,130,246,0.3)', color: 'var(--tier-blue)', icon: '💎' },
   };
 
   const style = tierStyles[mentor.mentorTier] || tierStyles['Mentor'];

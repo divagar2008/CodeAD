@@ -35,16 +35,22 @@ exports.getDashboard = async (req, res, next) => {
     });
     if (!student) throw new NotFoundError('Student not found');
 
-    const [recentSubmissions, totalProblems] = await Promise.all([
+    const [recentSubmissions, totalProblems, livePointsData] = await Promise.all([
       prisma.submissions.findMany({
         where: { student_id: req.user.id },
         include: { problem: { select: { title: true, difficulty: true } } },
         orderBy: { created_at: 'desc' }, take: 5,
       }),
       prisma.problems.count({ where: { is_active: true } }),
+      prisma.live_points.aggregate({
+        where: { student_id: req.user.id },
+        _sum: { points: true },
+      }),
     ]);
 
-    ApiResponse.success(res, { student, recentSubmissions, totalProblems });
+    const totalLivePoints = livePointsData._sum.points || 0;
+
+    ApiResponse.success(res, { student, recentSubmissions, totalProblems, totalLivePoints });
   } catch (err) { next(err); }
 };
 

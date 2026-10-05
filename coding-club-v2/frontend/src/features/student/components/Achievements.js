@@ -27,7 +27,7 @@ export default function Achievements({ achievements, totalEarned }) {
         Achievements
       </h3>
       <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 14 }}>
-        <strong style={{ color: '#a6e3a1' }}>{totalEarned}</strong> earned / {achievements.length} total
+        <strong style={{ color: 'var(--accent-green)' }}>{totalEarned}</strong> earned / {achievements.length} total
       </div>
 
       {earned.length > 0 && (
