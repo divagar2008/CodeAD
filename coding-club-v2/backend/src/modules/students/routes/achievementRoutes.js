@@ -4,7 +4,7 @@ const prisma = require('../../../config/database');
 const ApiResponse = require('../../../shared/utils/response');
 const { getTier, getStreak, getHeatmap, getScoreHistory, getTopStudents, getMentorStatus, TIERS } = require('../services/achievementService');
 
-router.use(authenticate, authorize('student', 'admin'));
+router.use(authenticate, authorize('student'));
 
 // Get all achievements with earned status
 router.get('/', async (req, res, next) => {

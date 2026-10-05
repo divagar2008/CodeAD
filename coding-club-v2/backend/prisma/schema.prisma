@@ -29,6 +29,17 @@ model students {
   student_achievements  student_achievements[]
 }
 
+// Single dedicated administrator account. Admins are NOT students: they have
+// their own credentials table and their own login endpoint (/auth/admin/login).
+model admins {
+  id         Int      @id @default(autoincrement())
+  name       String
+  email      String   @unique
+  password   String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
 model problems {
   id                Int      @id @default(autoincrement())
   title             String

@@ -10,8 +10,8 @@ async function main() {
   // All 56 students — AI&DS, 2nd Year (exact match to production DB)
   const students = [
     { name: 'Ahmed Athief Khan M V', email: 'athief@college.edu', role: 'student' },
-    { name: 'Divagar M K', email: 'mkdivagar7@gmail.com', role: 'admin' },
-    { name: 'Dharshan Bala P', email: 'dharshanbala007007@gmail.com', role: 'admin' },
+    { name: 'Divagar M K', email: 'mkdivagar7@gmail.com', role: 'student' },
+    { name: 'Dharshan Bala P', email: 'dharshanbala007007@gmail.com', role: 'student' },
     { name: 'Jeyavarshan B', email: 'jeyavarshan@college.edu', role: 'student' },
     { name: 'Deepan M', email: 'deepan@college.edu', role: 'student' },
     { name: 'Vetriselvam R', email: 'vetriselvam@college.edu', role: 'student' },
@@ -164,10 +164,19 @@ async function main() {
     console.log(`Created ${achievements.length} achievements`);
   }
 
+  // The single administrator is NOT a students row: it lives in its own
+  // admins table with its own credentials and its own login page.
+  // Only created when absent so an already-changed password is preserved.
+  if ((await prisma.admins.count()) === 0) {
+    await prisma.admins.create({
+      data: { name: 'Administrator', email: 'admin@codead.in', password: await bcrypt.hash('admin123', 12) },
+    });
+    console.log('Created administrator account');
+  }
+
   console.log('\nDone!');
-  console.log(`\nAdmin accounts (password: student123):`);
-  students.filter(s => s.role === 'admin').forEach(s => console.log(`  - ${s.name} <${s.email}>`));
-  console.log('');
+  console.log('\nAdmin sign-in (/admin/login): admin@codead.in / admin123');
+  console.log('All student accounts use password student123\n');
 }
 
 main().catch(e => { console.error(e); process.exit(1); }).finally(() => prisma.$disconnect());

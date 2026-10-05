@@ -4,21 +4,28 @@ import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from './stores/authStore';
 import api from './lib/api';
 import LoginPage from './features/auth/LoginPage';
+import AdminLoginPage from './features/auth/AdminLoginPage';
 import StudentLayout from './features/student/StudentLayout';
 import AdminLayout from './features/admin/AdminLayout';
 
 function Guard({ children, role }) {
   const user = useAuthStore(s => s.user);
-  if (!user) return <Navigate to="/login" />;
-  // Admin-role students can access both student and admin routes
-  if (role === 'student' && user.role !== 'student' && user.role !== 'admin') return <Navigate to="/login" />;
-  if (role === 'admin' && user.role !== 'admin') return <Navigate to="/login" />;
+  if (!user) return <Navigate to={role === 'admin' ? '/admin/login' : '/login'} />;
+  // Student routes are student-only. A session with the admin role is sent to
+  // its own dashboard — students and admins never share a view.
+  if (role === 'student' && user.role !== 'student') {
+    return <Navigate to={user.role === 'admin' ? '/admin' : '/login'} />;
+  }
+  // Admin routes require the dedicated administrator session.
+  if (role === 'admin' && user.role !== 'admin') {
+    return <Navigate to={user.role === 'student' ? '/dashboard' : '/login'} />;
+  }
   return children;
 }
 
 function Public({ children }) {
   const user = useAuthStore(s => s.user);
-  if (user) return <Navigate to="/dashboard" />;
+  if (user) return <Navigate to={user.role === 'admin' ? '/admin' : '/dashboard'} />;
   return children;
 }
 
@@ -32,22 +39,23 @@ export default function App() {
 
   const updateUser = useAuthStore(s => s.updateUser);
   const token = useAuthStore(s => s.token);
+  const user = useAuthStore(s => s.user);
 
   useEffect(() => {
     const t = localStorage.getItem('theme') || 'light';
     document.documentElement.setAttribute('data-theme', t);
   }, []);
 
-  // Auto-refresh user data from API on mount (fixes stale localStorage)
+  // Auto-refresh student data from API on mount (fixes stale localStorage).
+  // The administrator has no student profile, so its session skips this call.
   useEffect(() => {
-    if (!token) return;
+    if (!token || user?.role === 'admin') return;
     api.get('/student/profile').then(r => {
       if (r.data?.data) {
         const d = r.data.data;
         const updates = { name: d.name };
-        // Only overwrite role if the API actually returns one;
-        // otherwise keep the existing role from localStorage to avoid
-        // downgrading an admin to student on page refresh.
+        // Only overwrite role if the API actually returns one; otherwise keep
+        // the role already stored in localStorage.
         if (d.role) updates.role = d.role;
         updateUser(updates);
       }
@@ -59,6 +67,7 @@ export default function App() {
       <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
       <Routes>
         <Route path="/login" element={<Public><LoginPage /></Public>} />
+        <Route path="/admin/login" element={<Public><AdminLoginPage /></Public>} />
         <Route path="/dashboard" element={<Guard role="student"><StudentLayout page="dashboard" /></Guard>} />
         <Route path="/problems" element={<Guard role="student"><StudentLayout page="problems" /></Guard>} />
         <Route path="/problems/:id" element={<Guard role="student"><StudentLayout page="problem" /></Guard>} />

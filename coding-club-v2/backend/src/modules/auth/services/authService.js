@@ -16,7 +16,10 @@ exports.studentLogin = async (req, res, next) => {
     }
     if (!student.is_active) throw new AuthError('Account deactivated');
 
-    const studentRole = student.role || 'student';
+    // Admin access is issued exclusively by /auth/admin/login (admins table).
+    // The student login always yields a student token, even if a students row
+    // still carries role = "admin".
+    const studentRole = 'student';
     const token = jwt.sign(
       { id: student.id, email: student.email, role: studentRole },
       config.jwt.secret,
@@ -31,6 +34,34 @@ exports.studentLogin = async (req, res, next) => {
         department: student.department, year: student.year,
         coding_score: student.coding_score, total_points: student.total_points,
         problems_solved: student.problems_solved },
+    });
+  } catch (err) { next(err); }
+};
+
+// Dedicated administrator login. Credentials are checked against the admins
+// table only (never against students), and the issued token carries
+// src: 'admins' — which authorize('admin') requires, so tokens minted by the
+// old combined student login can never reach admin routes.
+exports.adminLogin = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+    const admin = await prisma.admins.findUnique({ where: { email } });
+
+    if (!admin || !(await bcrypt.compare(password, admin.password))) {
+      throw new AuthError('Invalid email or password');
+    }
+
+    const token = jwt.sign(
+      { id: admin.id, email: admin.email, role: 'admin', src: 'admins' },
+      config.jwt.secret,
+      { expiresIn: config.jwt.expiresIn }
+    );
+
+    logActivity(admin.id, 'admin', 'login');
+
+    ApiResponse.success(res, {
+      token,
+      user: { id: admin.id, name: admin.name, email: admin.email, role: 'admin' },
     });
   } catch (err) { next(err); }
 };

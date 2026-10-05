@@ -4,7 +4,7 @@ const { authenticate, authorize } = require('../../../middleware/auth');
 const svc = require('../services/studentService');
 
 const router = require('express').Router();
-router.use(authenticate, authorize('student', 'admin'));
+router.use(authenticate, authorize('student'));
 
 router.get('/dashboard', svc.getDashboard);
 router.get('/problems', svc.getProblems);
